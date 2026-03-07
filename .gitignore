@@ -1,0 +1,77 @@
+## Ignorar carpetas de build y binarios de .NET
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+## Carpetas de Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## NuGet
+*.nupkg
+**/packages/*
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Archivos de publicación y compilación
+[Pp]ublish/
+_publishedWebsites/
+WebPublish/
+*.pubxml
+*.publishproj
+
+## Archivos de cobertura de código y tests
+TestResults/
+[Cc]overage*/
+*.coverage
+*.coveragexml
+
+## ReSharper
+.idea/
+*.DotSettings.user
+
+## Rider
+.idea/
+
+## Archivos de entorno y configuración sensible
+appsettings.Development.json
+appsettings.Local.json
+.env
+*.env
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+## Archivos temporales
+*.tmp
+*.temp
+*~
+
+## Archivos de configuración de Debug
+launchSettings.json
+
+## Archivos de base de datos locales
+*.db
+*.db-shm
+*.db-wal
+*.mdf
+*.ldf
+
+## Archivos de log
+*.log
+
+## Certificados y llaves
+*.pfx
+*.p12
+*.key
+*.pem
