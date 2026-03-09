@@ -35,6 +35,16 @@ builder.Services.AddDbContext<ContpaqiDbContext>(options =>
     }
 });
 
+// Registrar DbContext secundario para CompacWAdmin (usuarios activos del sistema CONTPAQi)
+var compacWAdminConnectionString = builder.Configuration.GetConnectionString("CompacWAdmin");
+builder.Services.AddDbContext<CompacWAdminDbContext>(options =>
+{
+    var connStr = string.IsNullOrEmpty(compacWAdminConnectionString)
+        ? "Server=localhost\\PCOMERCIAL;Database=CompacWAdmin;Trusted_Connection=True;Encrypt=False;"
+        : compacWAdminConnectionString;
+    options.UseSqlServer(connStr);
+});
+
 // Registrar MediatR para CQRS
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 

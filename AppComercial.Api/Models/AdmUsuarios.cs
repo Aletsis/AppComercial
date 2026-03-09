@@ -4,42 +4,20 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace AppComercial.Api.Models;
 
 /// <summary>
-/// Representa un usuario del sistema en CONTPAQi Comercial (tabla admUsuarios).
+/// Representa un usuario con sesión activa en CONTPAQi Comercial.
+/// Tabla: CompacWAdmin.dbo.UsuariosActivos
+/// Esta tabla se actualiza en tiempo real cuando los usuarios abren/cierran sesión.
 /// </summary>
-[Table("admUsuarios")]
-public class AdmUsuarios
+[Table("UsuariosActivos")]
+public class AdmUsuariosActivos
 {
     [Key]
     [Column("CIDUSUARIO")]
-    public int Id { get; set; }
+    public int IdUsuario { get; set; }
 
-    [Column("CCODIGOUSUARIO")]
+    [Column("CUSUARIO")]
     public string? CodigoUsuario { get; set; }
 
-    [Column("CNOMBREUSUARIO")]
-    public string? NombreUsuario { get; set; }
-
-    [Column("CIDPERFIL")]
-    public int IdPerfil { get; set; }
-
-    [Column("CCONTRASENA")]
-    public string? Contrasena { get; set; }
-
-    [Column("CESTATUS")]
-    public int Estatus { get; set; } // 0 = Activo, 1 = Inactivo
-
-    [Column("CEMAIL")]
-    public string? Email { get; set; }
-
-    [Column("CTEXTOEXTRA1")]
-    public string? TextoExtra1 { get; set; }
-
-    [Column("CTEXTOEXTRA2")]
-    public string? TextoExtra2 { get; set; }
-
-    [Column("CTEXTOEXTRA3")]
-    public string? TextoExtra3 { get; set; }
-
-    [Column("CFECHAEXTRA")]
-    public DateTime? FechaExtra { get; set; }
+    [Column("CEMPRESA")]
+    public string? Empresa { get; set; }
 }

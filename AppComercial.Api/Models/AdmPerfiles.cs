@@ -4,25 +4,22 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace AppComercial.Api.Models;
 
 /// <summary>
-/// Representa un Perfil de usuario en CONTPAQi Comercial (tabla admPerfiles).
-/// Un perfil define los permisos y accesos que tienen los usuarios asociados.
+/// Representa una empresa registrada en el sistema CONTPAQi Comercial.
+/// Tabla: CompacWAdmin.dbo.Empresas
 /// </summary>
-[Table("admPerfiles")]
-public class AdmPerfiles
+[Table("Empresas")]
+public class AdmEmpresas
 {
     [Key]
-    [Column("CIDPERFIL")]
+    [Column("CIDEMPRESA")]
     public int Id { get; set; }
 
-    [Column("CCODIGOPERFIL")]
-    public string? CodigoPerfil { get; set; }
+    [Column("CNOMBREEMPRESA")]
+    public string? Nombre { get; set; }
 
-    [Column("CNOMBREPERFIL")]
-    public string? NombrePerfil { get; set; }
+    [Column("CRUTADATOS")]
+    public string? Ruta { get; set; }
 
-    [Column("CDESCRIPCIONPERFIL")]
-    public string? Descripcion { get; set; }
-
-    [Column("CESTATUS")]
-    public int Estatus { get; set; } // 0 = Activo, 1 = Inactivo
+    [Column("CRUTARESPALDOS")]
+    public string? RutaRespaldos { get; set; }
 }

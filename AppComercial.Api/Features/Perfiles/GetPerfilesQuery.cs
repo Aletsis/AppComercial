@@ -1,46 +1,47 @@
 using MediatR;
-using AppComercial.Api.Models;
 using AppComercial.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace AppComercial.Api.Features.Perfiles;
 
 /// <summary>
-/// Consulta para obtener los Perfiles de usuario de CONTPAQi Comercial.
-/// Los perfiles definen los permisos y accesos de los usuarios.
+/// Consulta para obtener la lista de empresas registradas en CONTPAQi.
+/// Los "perfiles" de usuario en CONTPAQi no se almacenan en tablas SQL accesibles
+/// directamente — se gestionan internamente desde la aplicación CONTPAQi.
+/// Este endpoint retorna las empresas disponibles en el sistema (tabla Empresas de CompacWAdmin).
 /// </summary>
-public class GetPerfilesQuery : IRequest<IEnumerable<AdmPerfiles>>
+public class GetEmpresasQuery : IRequest<IEnumerable<EmpresaDto>>
 {
-    /// <summary>Filtra por código de perfil. Ejemplo: "ADMIN", "VENDEDOR".</summary>
-    public string? CodigoPerfil { get; set; }
-
-    /// <summary>
-    /// Filtra por estado. 0 = Activos (default), 1 = Inactivos, null = Todos.
-    /// </summary>
-    public int? Estatus { get; set; } = 0;
+    /// <summary>Filtra por nombre de empresa.</summary>
+    public string? Nombre { get; set; }
 }
 
-public class GetPerfilesQueryHandler : IRequestHandler<GetPerfilesQuery, IEnumerable<AdmPerfiles>>
-{
-    private readonly ContpaqiDbContext _dbContext;
+/// <summary>DTO con información de una empresa registrada en CONTPAQi.</summary>
+public record EmpresaDto(
+    int Id,
+    string? Nombre,
+    string? Ruta
+);
 
-    public GetPerfilesQueryHandler(ContpaqiDbContext dbContext)
+public class GetEmpresasQueryHandler : IRequestHandler<GetEmpresasQuery, IEnumerable<EmpresaDto>>
+{
+    private readonly CompacWAdminDbContext _dbContext;
+
+    public GetEmpresasQueryHandler(CompacWAdminDbContext dbContext)
     {
         _dbContext = dbContext;
     }
 
-    public async Task<IEnumerable<AdmPerfiles>> Handle(GetPerfilesQuery request, CancellationToken cancellationToken)
+    public async Task<IEnumerable<EmpresaDto>> Handle(GetEmpresasQuery request, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Perfiles.AsNoTracking();
+        var query = _dbContext.Empresas.AsNoTracking();
 
-        if (!string.IsNullOrWhiteSpace(request.CodigoPerfil))
-            query = query.Where(p => p.CodigoPerfil == request.CodigoPerfil);
-
-        if (request.Estatus.HasValue)
-            query = query.Where(p => p.Estatus == request.Estatus.Value);
+        if (!string.IsNullOrWhiteSpace(request.Nombre))
+            query = query.Where(e => e.Nombre != null && e.Nombre.Contains(request.Nombre));
 
         return await query
-            .OrderBy(p => p.CodigoPerfil)
+            .OrderBy(e => e.Nombre)
+            .Select(e => new EmpresaDto(e.Id, e.Nombre, e.Ruta))
             .ToListAsync(cancellationToken);
     }
 }
