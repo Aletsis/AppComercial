@@ -47,11 +47,7 @@ public class CacUsuario
     [Column("GUIDUSUARIO")]
     public string? GuidUsuario { get; set; }
 
-    /// <summary>Nivel de acceso del usuario.</summary>
-    [Column("NIVEL")]
-    public int? Nivel { get; set; }
-
     /// <summary>ID del perfil de permisos asignado al usuario.</summary>
-    [Column("PERFIL")]
+    [Column("NIVEL")]
     public int? IdPerfil { get; set; }
 }
