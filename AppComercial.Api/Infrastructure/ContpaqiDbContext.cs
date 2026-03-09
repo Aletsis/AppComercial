@@ -19,6 +19,8 @@ public class ContpaqiDbContext : DbContext
     public DbSet<AdmUnidadesMedidaPeso> UnidadesMedidaPeso => Set<AdmUnidadesMedidaPeso>();
     public DbSet<AdmAgentes> Agentes => Set<AdmAgentes>();
     public DbSet<AdmDomicilios> Domicilios => Set<AdmDomicilios>();
+    public DbSet<AdmUsuarios> Usuarios => Set<AdmUsuarios>();
+    public DbSet<AdmPerfiles> Perfiles => Set<AdmPerfiles>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
