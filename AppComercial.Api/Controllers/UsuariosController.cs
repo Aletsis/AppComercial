@@ -5,14 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace AppComercial.Api.Controllers;
 
 /// <summary>
-/// Endpoints para consultar Usuarios de CONTPAQi Comercial.
-/// 
-/// NOTA TÉCNICA: CONTPAQi Comercial no almacena sus usuarios en la base de datos
-/// de la empresa (adEMPRESA_*). Los usuarios se gestionan internamente desde la
-/// aplicación CONTPAQi. Lo disponible vía SQL es la tabla UsuariosActivos en
-/// CompacWAdmin, que muestra qué usuarios tienen sesión abierta en este momento.
-/// 
-/// Para crear o eliminar usuarios, utilice la interfaz de administración de CONTPAQi.
+/// Endpoints para gestionar Usuarios de CONTPAQi Comercial.
+/// Los usuarios se almacenan en RepositorioAdminPAQ.dbo.CAC10000.
+/// Las contraseñas nunca se retornan en respuestas GET.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -26,26 +21,29 @@ public class UsuariosController : ControllerBase
     }
 
     /// <summary>
-    /// Lista los usuarios con sesión activa en CONTPAQi Comercial en este momento.
-    /// Filtra opcionalmente por código de usuario o empresa.
+    /// Lista los usuarios de CONTPAQi Comercial (IDSISTEMA=5).
+    /// Filtros opcionales: clave (login), nombre, idPerfil.
+    /// Las contraseñas se excluyen de la respuesta por seguridad.
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<UsuarioActivoDto>>> Get(
-        [FromQuery] string? codigoUsuario,
-        [FromQuery] string? empresa)
+    public async Task<ActionResult<IEnumerable<UsuarioDto>>> Get(
+        [FromQuery] string? clave,
+        [FromQuery] string? nombre,
+        [FromQuery] int? idPerfil)
     {
         try
         {
             var query = new GetUsuariosQuery
             {
-                CodigoUsuario = codigoUsuario,
-                Empresa       = empresa
+                Clave    = clave,
+                Nombre   = nombre,
+                IdPerfil = idPerfil
             };
             return Ok(await _mediator.Send(query));
         }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error al obtener usuarios activos: {ex.Message}");
+            return StatusCode(500, $"Error al obtener usuarios: {ex.Message}");
         }
     }
 }

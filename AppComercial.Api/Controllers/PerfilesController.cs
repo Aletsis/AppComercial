@@ -1,16 +1,14 @@
 using AppComercial.Api.Features.Perfiles;
+using AppComercial.Api.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppComercial.Api.Controllers;
 
 /// <summary>
-/// Endpoints para consultar las Empresas registradas en el sistema CONTPAQi Comercial.
-/// 
-/// NOTA: Los perfiles de usuario en CONTPAQi no se almacenan en tablas SQL accesibles.
-/// Se gestionan internamente desde la aplicación CONTPAQi Comercial.
-/// Este controller expone en cambio las Empresas disponibles en el sistema,
-/// información útil para saber a qué empresa conectar el SDK.
+/// Endpoints para gestionar Perfiles de permisos de CONTPAQi Comercial.
+/// Los perfiles se almacenan en RepositorioAdminPAQ.dbo.CAC30000.
+/// La configuración detallada de permisos por módulo se gestiona desde la aplicación CONTPAQi.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -24,21 +22,21 @@ public class PerfilesController : ControllerBase
     }
 
     /// <summary>
-    /// Lista las empresas registradas en CONTPAQi Comercial.
-    /// Use la Ruta de la empresa para configurar DirectorioEmpresa en appsettings.json.
+    /// Lista los perfiles de permisos disponibles en CONTPAQi Comercial.
+    /// Use el IdPerfil para asignarlo al crear o actualizar un usuario.
     /// </summary>
-    [HttpGet("empresas")]
-    public async Task<ActionResult<IEnumerable<EmpresaDto>>> GetEmpresas(
-        [FromQuery] string? nombre)
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<CacPerfil>>> Get(
+        [FromQuery] string? descripcion)
     {
         try
         {
-            var query = new GetEmpresasQuery { Nombre = nombre };
+            var query = new GetPerfilesQuery { Descripcion = descripcion };
             return Ok(await _mediator.Send(query));
         }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error al obtener empresas: {ex.Message}");
+            return StatusCode(500, $"Error al obtener perfiles: {ex.Message}");
         }
     }
 }

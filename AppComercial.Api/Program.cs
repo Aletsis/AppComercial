@@ -45,6 +45,16 @@ builder.Services.AddDbContext<CompacWAdminDbContext>(options =>
     options.UseSqlServer(connStr);
 });
 
+// Registrar DbContext para RepositorioAdminPAQ (usuarios y perfiles de CONTPAQi)
+var repositorioAdminConnectionString = builder.Configuration.GetConnectionString("RepositorioAdminPAQ");
+builder.Services.AddDbContext<RepositorioAdminDbContext>(options =>
+{
+    var connStr = string.IsNullOrEmpty(repositorioAdminConnectionString)
+        ? "Server=localhost\\PCOMERCIAL;Database=RepositorioAdminPAQ;Trusted_Connection=True;Encrypt=False;"
+        : repositorioAdminConnectionString;
+    options.UseSqlServer(connStr);
+});
+
 // Registrar MediatR para CQRS
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 

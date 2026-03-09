@@ -1,47 +1,38 @@
 using MediatR;
+using AppComercial.Api.Models;
 using AppComercial.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace AppComercial.Api.Features.Perfiles;
 
 /// <summary>
-/// Consulta para obtener la lista de empresas registradas en CONTPAQi.
-/// Los "perfiles" de usuario en CONTPAQi no se almacenan en tablas SQL accesibles
-/// directamente — se gestionan internamente desde la aplicación CONTPAQi.
-/// Este endpoint retorna las empresas disponibles en el sistema (tabla Empresas de CompacWAdmin).
+/// Consulta para obtener los Perfiles de permisos de CONTPAQi Comercial desde RepositorioAdminPAQ.
+/// Use el IdPerfil de cada perfil para asignarlo a un usuario.
 /// </summary>
-public class GetEmpresasQuery : IRequest<IEnumerable<EmpresaDto>>
+public class GetPerfilesQuery : IRequest<IEnumerable<CacPerfil>>
 {
-    /// <summary>Filtra por nombre de empresa.</summary>
-    public string? Nombre { get; set; }
+    /// <summary>Filtra por descripción del perfil (búsqueda parcial).</summary>
+    public string? Descripcion { get; set; }
 }
 
-/// <summary>DTO con información de una empresa registrada en CONTPAQi.</summary>
-public record EmpresaDto(
-    int Id,
-    string? Nombre,
-    string? Ruta
-);
-
-public class GetEmpresasQueryHandler : IRequestHandler<GetEmpresasQuery, IEnumerable<EmpresaDto>>
+public class GetPerfilesQueryHandler : IRequestHandler<GetPerfilesQuery, IEnumerable<CacPerfil>>
 {
-    private readonly CompacWAdminDbContext _dbContext;
+    private readonly RepositorioAdminDbContext _dbContext;
 
-    public GetEmpresasQueryHandler(CompacWAdminDbContext dbContext)
+    public GetPerfilesQueryHandler(RepositorioAdminDbContext dbContext)
     {
         _dbContext = dbContext;
     }
 
-    public async Task<IEnumerable<EmpresaDto>> Handle(GetEmpresasQuery request, CancellationToken cancellationToken)
+    public async Task<IEnumerable<CacPerfil>> Handle(GetPerfilesQuery request, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Empresas.AsNoTracking();
+        var query = _dbContext.Perfiles.AsNoTracking();
 
-        if (!string.IsNullOrWhiteSpace(request.Nombre))
-            query = query.Where(e => e.Nombre != null && e.Nombre.Contains(request.Nombre));
+        if (!string.IsNullOrWhiteSpace(request.Descripcion))
+            query = query.Where(p => p.Descripcion != null && p.Descripcion.Contains(request.Descripcion));
 
         return await query
-            .OrderBy(e => e.Nombre)
-            .Select(e => new EmpresaDto(e.Id, e.Nombre, e.Ruta))
+            .OrderBy(p => p.Descripcion)
             .ToListAsync(cancellationToken);
     }
 }
