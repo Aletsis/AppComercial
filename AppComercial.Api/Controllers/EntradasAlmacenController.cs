@@ -71,7 +71,7 @@ public class EntradasAlmacenController : ControllerBase
     [HttpPut("{codigoConcepto}/{serie}/{folio}")]
     public async Task<ActionResult<int>> Put(
         string codigoConcepto, string serie, string folio,
-        [FromBody] Features.Documentos.UpdateDocumentoCommand command)
+        [FromBody] Features.EntradasAlmacen.UpdateEntradaAlmacenCommand command)
     {
         try
         {

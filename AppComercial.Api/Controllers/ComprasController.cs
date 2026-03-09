@@ -72,7 +72,7 @@ public class ComprasController : ControllerBase
     [HttpPut("{codigoConcepto}/{serie}/{folio}")]
     public async Task<ActionResult<int>> Put(
         string codigoConcepto, string serie, string folio,
-        [FromBody] Features.Documentos.UpdateDocumentoCommand command)
+        [FromBody] UpdateCompraCommand command)
     {
         try
         {
