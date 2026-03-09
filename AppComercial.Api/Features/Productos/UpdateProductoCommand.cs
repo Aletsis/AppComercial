@@ -1,15 +1,77 @@
 using MediatR;
 using AppComercial.Api.Sdk;
+using System.ComponentModel.DataAnnotations;
 
 namespace AppComercial.Api.Features.Productos;
 
+/// <summary>
+/// Comando para actualizar los datos de un Producto existente en CONTPAQi Comercial.
+/// El código del producto se proporciona en la URL (ruta) del endpoint PUT.
+/// Al menos uno de los campos opcionales debe ser enviado.
+/// </summary>
 public class UpdateProductoCommand : IRequest<int>
 {
+    /// <summary>
+    /// Código del producto a actualizar. Se asigna automáticamente desde la URL.
+    /// No es necesario incluirlo en el cuerpo del request.
+    /// </summary>
     public string Codigo { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Nuevo nombre corto del producto. Opcional. Máximo 60 caracteres.
+    /// </summary>
+    [StringLength(60, MinimumLength = 1, ErrorMessage = "El nombre debe tener entre 1 y 60 caracteres.")]
     public string? Nombre { get; set; }
+
+    /// <summary>
+    /// Nueva descripción del producto. Opcional. Máximo 255 caracteres.
+    /// </summary>
+    [StringLength(255, ErrorMessage = "La descripción no puede exceder 255 caracteres.")]
     public string? Descripcion { get; set; }
+
+    /// <summary>
+    /// Nuevo tipo de producto. Opcional.
+    /// Valores válidos: 1 = Producto, 2 = Paquete, 3 = Servicio.
+    /// </summary>
+    [Range(1, 3, ErrorMessage = "TipoProducto debe ser 1 (Producto), 2 (Paquete) o 3 (Servicio).")]
     public int? TipoProducto { get; set; }
+
+    /// <summary>
+    /// Nuevo control de existencia. Opcional.
+    /// Valores válidos: 0=Sin control, 1=Unidades, 2=Lotes, 3=Series, 4=Pedimentos.
+    /// </summary>
+    [Range(0, 4, ErrorMessage = "ControlExistencia debe ser un valor entre 0 y 4.")]
     public int? ControlExistencia { get; set; }
+
+    /// <summary>
+    /// Nuevo precio de lista 1. Opcional. Debe ser mayor o igual a 0.
+    /// </summary>
+    [Range(0, double.MaxValue, ErrorMessage = "El precio debe ser mayor o igual a 0.")]
+    public double? Precio1 { get; set; }
+
+    /// <summary>
+    /// Nuevo porcentaje de impuesto 1 (IVA). Opcional. Entre 0 y 100.
+    /// </summary>
+    [Range(0, 100, ErrorMessage = "El impuesto 1 debe ser un porcentaje entre 0 y 100.")]
+    public double? Impuesto1 { get; set; }
+
+    /// <summary>
+    /// Texto extra 1 del producto. Opcional. Máximo 50 caracteres.
+    /// </summary>
+    [StringLength(50, ErrorMessage = "TextoExtra1 no puede exceder 50 caracteres.")]
+    public string? TextoExtra1 { get; set; }
+
+    /// <summary>
+    /// Texto extra 2 del producto. Opcional. Máximo 50 caracteres.
+    /// </summary>
+    [StringLength(50, ErrorMessage = "TextoExtra2 no puede exceder 50 caracteres.")]
+    public string? TextoExtra2 { get; set; }
+
+    /// <summary>
+    /// Texto extra 3 del producto. Opcional. Máximo 50 caracteres.
+    /// </summary>
+    [StringLength(50, ErrorMessage = "TextoExtra3 no puede exceder 50 caracteres.")]
+    public string? TextoExtra3 { get; set; }
 }
 
 public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoCommand, int>
@@ -23,26 +85,41 @@ public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoComman
 
     public async Task<int> Handle(UpdateProductoCommand request, CancellationToken cancellationToken)
     {
-        var actualizarProductoParams = new Dictionary<string, string>();
+        var datos = new Dictionary<string, string>();
 
-        if (request.Nombre != null)
-            actualizarProductoParams["CNOMBREPRODUCTO"] = request.Nombre;
-            
-        if (request.Descripcion != null)
-            actualizarProductoParams["CDESCRIPCIONPRODUCTO"] = request.Descripcion;
+        if (!string.IsNullOrWhiteSpace(request.Nombre))
+            datos["CNOMBREPRODUCTO"] = request.Nombre;
 
-        if (request.TipoProducto != null)
-            actualizarProductoParams["CTIPOPRODUCTO"] = request.TipoProducto.Value.ToString();
+        if (!string.IsNullOrWhiteSpace(request.Descripcion))
+            datos["CDESCRIPCIONPRODUCTO"] = request.Descripcion;
 
-        if (request.ControlExistencia != null)
-            actualizarProductoParams["CCONTROLEXISTENCIA"] = request.ControlExistencia.Value.ToString();
+        if (request.TipoProducto.HasValue)
+            datos["CTIPOPRODUCTO"] = request.TipoProducto.Value.ToString();
 
-        if (actualizarProductoParams.Count == 0)
-        {
-            throw new ArgumentException("No se proporcionaron datos para actualizar.");
-        }
+        if (request.ControlExistencia.HasValue)
+            datos["CCONTROLEXISTENCIA"] = request.ControlExistencia.Value.ToString();
 
-        var result = await _sdk.ActualizarProductoAsync(request.Codigo, actualizarProductoParams);
-        return result;
+        if (request.Precio1.HasValue)
+            datos["CPRECIO1"] = request.Precio1.Value.ToString("F6");
+
+        if (request.Impuesto1.HasValue)
+            datos["CIMPUESTO1"] = request.Impuesto1.Value.ToString("F6");
+
+        if (!string.IsNullOrWhiteSpace(request.TextoExtra1))
+            datos["CTEXTOEXTRA1"] = request.TextoExtra1;
+
+        if (!string.IsNullOrWhiteSpace(request.TextoExtra2))
+            datos["CTEXTOEXTRA2"] = request.TextoExtra2;
+
+        if (!string.IsNullOrWhiteSpace(request.TextoExtra3))
+            datos["CTEXTOEXTRA3"] = request.TextoExtra3;
+
+        if (datos.Count == 0)
+            throw new ArgumentException(
+                "Se debe proporcionar al menos un campo para actualizar: " +
+                "Nombre, Descripcion, TipoProducto, ControlExistencia, " +
+                "Precio1, Impuesto1, TextoExtra1, TextoExtra2 o TextoExtra3.");
+
+        return await _sdk.ActualizarProductoAsync(request.Codigo, datos);
     }
 }
