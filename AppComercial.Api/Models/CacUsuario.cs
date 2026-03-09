@@ -52,6 +52,6 @@ public class CacUsuario
     public int? Nivel { get; set; }
 
     /// <summary>ID del perfil de permisos asignado al usuario.</summary>
-    [Column("IDPERFIL")]
+    [Column("PERFIL")]
     public int? IdPerfil { get; set; }
 }
