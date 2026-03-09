@@ -1,6 +1,4 @@
 using AppComercial.Api.Features.NotasCredito;
-using AppComercial.Api.Features.Documentos;
-using AppComercial.Api.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,29 +20,30 @@ public class NotasCreditoController : ControllerBase
     }
 
     /// <summary>
-    /// Lista los documentos de Nota de Crédito, filtrados opcionalmente por concepto, cliente, serie o rango de fechas.
+    /// Lista las Notas de Crédito y Devoluciones sobre Venta.
+    /// Filtra automáticamente por Conceptos con CNATURALEZA = 3.
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AdmDocumentos>>> Get(
+    public async Task<ActionResult<IEnumerable<Models.AdmDocumentos>>> Get(
         [FromQuery] string? codigoConcepto,
         [FromQuery] string? serie,
         [FromQuery] int? clienteId,
         [FromQuery] DateTime? fechaDesde,
-        [FromQuery] DateTime? fechaHasta)
+        [FromQuery] DateTime? fechaHasta,
+        [FromQuery] int take = 100)
     {
         try
         {
-            var query = new GetDocumentosQuery
+            var query = new GetNotasCreditoQuery
             {
-                CodigoConcepto     = codigoConcepto,
-                Serie              = serie,
-                ClienteProveedorId = clienteId,
-                FechaDesde         = fechaDesde,
-                FechaHasta         = fechaHasta,
-                Naturaleza         = 3 // Devoluciones sobre venta
+                CodigoConcepto = codigoConcepto,
+                Serie          = serie,
+                ClienteId      = clienteId,
+                FechaDesde     = fechaDesde,
+                FechaHasta     = fechaHasta,
+                Take           = take
             };
-            var result = await _mediator.Send(query);
-            return Ok(result);
+            return Ok(await _mediator.Send(query));
         }
         catch (Exception ex)
         {
@@ -53,7 +52,7 @@ public class NotasCreditoController : ControllerBase
     }
 
     /// <summary>
-    /// Crea una Nota de Crédito / Devolución completa (cabecera + partidas) en un solo request.
+    /// Crea una Nota de Crédito completa (cabecera + partidas) en un solo request.
     /// Los productos regresan al almacén especificado en cada partida.
     /// </summary>
     [HttpPost]
@@ -61,8 +60,7 @@ public class NotasCreditoController : ControllerBase
     {
         try
         {
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {
@@ -76,15 +74,14 @@ public class NotasCreditoController : ControllerBase
     [HttpPut("{codigoConcepto}/{serie}/{folio}")]
     public async Task<ActionResult<int>> Put(
         string codigoConcepto, string serie, string folio,
-        [FromBody] UpdateDocumentoCommand command)
+        [FromBody] UpdateNotaCreditoCommand command)
     {
         try
         {
             command.CodigoConcepto = codigoConcepto;
             command.Serie          = serie;
             command.Folio          = folio;
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {
@@ -96,12 +93,11 @@ public class NotasCreditoController : ControllerBase
     /// Emite/timbra una Nota de Crédito como CFDI (cuando aplica).
     /// </summary>
     [HttpPost("emitir")]
-    public async Task<ActionResult<int>> Emitir([FromBody] EmitirDocumentoCommand command)
+    public async Task<ActionResult<int>> Emitir([FromBody] Features.Documentos.EmitirDocumentoCommand command)
     {
         try
         {
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {
@@ -113,12 +109,11 @@ public class NotasCreditoController : ControllerBase
     /// Cancela una Nota de Crédito existente.
     /// </summary>
     [HttpPost("cancelar")]
-    public async Task<ActionResult<int>> Cancelar([FromBody] CancelarDocumentoCommand command)
+    public async Task<ActionResult<int>> Cancelar([FromBody] Features.Documentos.CancelarDocumentoCommand command)
     {
         try
         {
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {

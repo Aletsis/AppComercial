@@ -1,6 +1,4 @@
 using AppComercial.Api.Features.Facturas;
-using AppComercial.Api.Features.Documentos;
-using AppComercial.Api.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,29 +19,30 @@ public class FacturasController : ControllerBase
     }
 
     /// <summary>
-    /// Lista los documentos de Factura, filtrados opcionalmente por concepto, cliente, serie o rango de fechas.
+    /// Lista las Facturas de Venta, filtradas opcionalmente por concepto, cliente, serie o rango de fechas.
+    /// Filtra automáticamente por Conceptos con CNATURALEZA = 1.
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AdmDocumentos>>> Get(
+    public async Task<ActionResult<IEnumerable<Models.AdmDocumentos>>> Get(
         [FromQuery] string? codigoConcepto,
         [FromQuery] string? serie,
         [FromQuery] int? clienteId,
         [FromQuery] DateTime? fechaDesde,
-        [FromQuery] DateTime? fechaHasta)
+        [FromQuery] DateTime? fechaHasta,
+        [FromQuery] int take = 100)
     {
         try
         {
-            var query = new GetDocumentosQuery
+            var query = new GetFacturasQuery
             {
-                CodigoConcepto      = codigoConcepto,
-                Serie               = serie,
-                ClienteProveedorId  = clienteId,
-                FechaDesde          = fechaDesde,
-                FechaHasta          = fechaHasta,
-                Naturaleza          = 1 // Ventas
+                CodigoConcepto = codigoConcepto,
+                Serie          = serie,
+                ClienteId      = clienteId,
+                FechaDesde     = fechaDesde,
+                FechaHasta     = fechaHasta,
+                Take           = take
             };
-            var result = await _mediator.Send(query);
-            return Ok(result);
+            return Ok(await _mediator.Send(query));
         }
         catch (Exception ex)
         {
@@ -59,8 +58,7 @@ public class FacturasController : ControllerBase
     {
         try
         {
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {
@@ -74,15 +72,14 @@ public class FacturasController : ControllerBase
     [HttpPut("{codigoConcepto}/{serie}/{folio}")]
     public async Task<ActionResult<int>> Put(
         string codigoConcepto, string serie, string folio,
-        [FromBody] UpdateDocumentoCommand command)
+        [FromBody] UpdateFacturaCommand command)
     {
         try
         {
             command.CodigoConcepto = codigoConcepto;
             command.Serie          = serie;
             command.Folio          = folio;
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {
@@ -94,12 +91,11 @@ public class FacturasController : ControllerBase
     /// Emite/timbra una Factura como CFDI.
     /// </summary>
     [HttpPost("emitir")]
-    public async Task<ActionResult<int>> Emitir([FromBody] EmitirDocumentoCommand command)
+    public async Task<ActionResult<int>> Emitir([FromBody] Features.Documentos.EmitirDocumentoCommand command)
     {
         try
         {
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {
@@ -111,12 +107,11 @@ public class FacturasController : ControllerBase
     /// Cancela una Factura existente.
     /// </summary>
     [HttpPost("cancelar")]
-    public async Task<ActionResult<int>> Cancelar([FromBody] CancelarDocumentoCommand command)
+    public async Task<ActionResult<int>> Cancelar([FromBody] Features.Documentos.CancelarDocumentoCommand command)
     {
         try
         {
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {
@@ -128,12 +123,11 @@ public class FacturasController : ControllerBase
     /// Salda una Factura contra un documento de pago.
     /// </summary>
     [HttpPost("saldar")]
-    public async Task<ActionResult<int>> Saldar([FromBody] SaldarDocumentoCommand command)
+    public async Task<ActionResult<int>> Saldar([FromBody] Features.Documentos.SaldarDocumentoCommand command)
     {
         try
         {
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {

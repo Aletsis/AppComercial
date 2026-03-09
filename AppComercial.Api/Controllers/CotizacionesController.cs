@@ -1,6 +1,4 @@
 using AppComercial.Api.Features.Cotizaciones;
-using AppComercial.Api.Features.Documentos;
-using AppComercial.Api.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,29 +20,30 @@ public class CotizacionesController : ControllerBase
     }
 
     /// <summary>
-    /// Lista los documentos de Cotización, filtrados opcionalmente por concepto, cliente, serie o rango de fechas.
+    /// Lista las Cotizaciones. Se recomienda usar el filtro codigoConcepto para distinguirlas
+    /// de otras naturaleza-1 (facturas, pedidos).
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AdmDocumentos>>> Get(
+    public async Task<ActionResult<IEnumerable<Models.AdmDocumentos>>> Get(
         [FromQuery] string? codigoConcepto,
         [FromQuery] string? serie,
         [FromQuery] int? clienteId,
         [FromQuery] DateTime? fechaDesde,
-        [FromQuery] DateTime? fechaHasta)
+        [FromQuery] DateTime? fechaHasta,
+        [FromQuery] int take = 100)
     {
         try
         {
-            var query = new GetDocumentosQuery
+            var query = new GetCotizacionesQuery
             {
-                CodigoConcepto     = codigoConcepto,
-                Serie              = serie,
-                ClienteProveedorId = clienteId,
-                FechaDesde         = fechaDesde,
-                FechaHasta         = fechaHasta,
-                Naturaleza         = 1 // Ventas (incluye cotizaciones según el concepto configurado)
+                CodigoConcepto = codigoConcepto,
+                Serie          = serie,
+                ClienteId      = clienteId,
+                FechaDesde     = fechaDesde,
+                FechaHasta     = fechaHasta,
+                Take           = take
             };
-            var result = await _mediator.Send(query);
-            return Ok(result);
+            return Ok(await _mediator.Send(query));
         }
         catch (Exception ex)
         {
@@ -61,8 +60,7 @@ public class CotizacionesController : ControllerBase
     {
         try
         {
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {
@@ -76,15 +74,14 @@ public class CotizacionesController : ControllerBase
     [HttpPut("{codigoConcepto}/{serie}/{folio}")]
     public async Task<ActionResult<int>> Put(
         string codigoConcepto, string serie, string folio,
-        [FromBody] UpdateDocumentoCommand command)
+        [FromBody] UpdateCotizacionCommand command)
     {
         try
         {
             command.CodigoConcepto = codigoConcepto;
             command.Serie          = serie;
             command.Folio          = folio;
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            return Ok(await _mediator.Send(command));
         }
         catch (Exception ex)
         {
