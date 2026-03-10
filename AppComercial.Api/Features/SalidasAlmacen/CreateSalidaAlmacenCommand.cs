@@ -33,14 +33,6 @@ public class CreateSalidaAlmacenCommand : IRequest<int>
     public string Referencia { get; set; } = string.Empty;
 
     /// <summary>
-    /// Código del almacén origen del que salen las mercancías. Requerido.
-    /// Ejemplo: "ALM01"
-    /// </summary>
-    [Required(ErrorMessage = "El código del almacén es requerido.")]
-    [StringLength(30, MinimumLength = 1, ErrorMessage = "El código del almacén debe tener entre 1 y 30 caracteres.")]
-    public string CodigoAlmacen { get; set; } = string.Empty;
-
-    /// <summary>
     /// Lista de productos que salen del almacén. Se requiere al menos una partida.
     /// </summary>
     [MinLength(1, ErrorMessage = "La salida de almacén debe tener al menos una partida.")]
@@ -59,6 +51,14 @@ public class SalidaPartida
     [Required(ErrorMessage = "El código del producto es requerido en cada partida.")]
     [StringLength(30, MinimumLength = 1, ErrorMessage = "El código del producto debe tener entre 1 y 30 caracteres.")]
     public string CodigoProducto { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Código del almacén origen del que salen las mercancías. Requerido.
+    /// Ejemplo: "ALM01"
+    /// </summary>
+    [Required(ErrorMessage = "El código del almacén es requerido en cada partida.")]
+    [StringLength(30, MinimumLength = 1, ErrorMessage = "El código del almacén debe tener entre 1 y 30 caracteres.")]
+    public string CodigoAlmacen { get; set; } = string.Empty;
 
     /// <summary>
     /// Cantidad de unidades que salen. Debe ser mayor a 0.
@@ -102,7 +102,7 @@ public class CreateSalidaAlmacenCommandHandler : IRequestHandler<CreateSalidaAlm
                 aUnidades         = partida.Unidades,
                 aCosto            = 0,
                 aPrecio           = 0,
-                aCodAlmacen       = request.CodigoAlmacen,
+                aCodAlmacen       = partida.CodigoAlmacen,
                 aReferencia       = string.Empty,
                 aCodClasificacion = string.Empty
             };

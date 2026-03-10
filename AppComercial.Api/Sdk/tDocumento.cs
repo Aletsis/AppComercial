@@ -17,12 +17,12 @@ public struct tDocumento
 
     public double aDescuentoDoc2;
 
-    public double aSistemaOrigen;
+    public int aSistemaOrigen;
 
     [MarshalAs(UnmanagedType.ByValTStr, SizeConst = SdkConstantes.kLongCodigo)]
     public string aCodConcepto;
 
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = SdkConstantes.kLongCodigo)]
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = SdkConstantes.kLongSerie)]
     public string aSerie;
 
     [MarshalAs(UnmanagedType.ByValTStr, SizeConst = SdkConstantes.kLongFecha)]
@@ -34,7 +34,7 @@ public struct tDocumento
     [MarshalAs(UnmanagedType.ByValTStr, SizeConst = SdkConstantes.kLongCodigo)]
     public string aCodigoAgente;
 
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = SdkConstantes.kLongDescripcion)]
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = SdkConstantes.kLongReferencia)]
     public string aReferencia;
 
     public int aAfecta;

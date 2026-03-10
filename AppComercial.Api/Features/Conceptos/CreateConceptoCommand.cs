@@ -27,6 +27,14 @@ public class CreateConceptoCommand : IRequest<int>
     public string Nombre { get; set; } = string.Empty;
 
     /// <summary>
+    /// ID del tipo de documento base (factura, salida, compra, etc.). Requerido.
+    /// Especifica de qué tipo de documento base hereda sus características este concepto.
+    /// </summary>
+    [Required(ErrorMessage = "El ID del tipo de documento es requerido.")]
+    [Range(1, int.MaxValue, ErrorMessage = "El ID del tipo de documento debe ser un valor válido.")]
+    public int IdDocumentoDe { get; set; }
+
+    /// <summary>
     /// Naturaleza del concepto. Requerido.
     /// Valores válidos:
     ///   1 = Venta
@@ -78,6 +86,7 @@ public class CreateConceptoCommandHandler : IRequestHandler<CreateConceptoComman
         {
             ["CCODIGOCONCEPTO"] = request.Codigo,
             ["CNOMBRECONCEPTO"] = request.Nombre,
+            ["CIDDOCUMENTODE"]  = request.IdDocumentoDe.ToString(),
             ["CNATURALEZA"]     = request.Naturaleza.ToString(),
             ["CESCFD"]          = request.EsCFD.ToString()
         };

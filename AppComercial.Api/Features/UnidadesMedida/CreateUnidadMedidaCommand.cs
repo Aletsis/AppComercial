@@ -33,6 +33,16 @@ public class CreateUnidadMedidaCommand : IRequest<int>
     [Required(ErrorMessage = "El despliegue es requerido.")]
     [StringLength(20, MinimumLength = 1, ErrorMessage = "El despliegue debe tener entre 1 y 20 caracteres.")]
     public string Despliegue { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Clave SAT de la unidad. Opcional. (CCLAVEINT)
+    /// </summary>
+    public string? ClaveInt { get; set; }
+
+    /// <summary>
+    /// Clave de comercio exterior de la unidad. Opcional. (CCLAVESAT)
+    /// </summary>
+    public string? ClaveSat { get; set; }
 }
 
 public class CreateUnidadMedidaCommandHandler : IRequestHandler<CreateUnidadMedidaCommand, int>
@@ -53,6 +63,21 @@ public class CreateUnidadMedidaCommandHandler : IRequestHandler<CreateUnidadMedi
             cDespliegue   = request.Despliegue
         };
 
-        return await _sdk.CrearUnidadMedidaAsync(nuevaUnidad);
+        var idUnidad = await _sdk.CrearUnidadMedidaAsync(nuevaUnidad);
+
+        var datosExtra = new Dictionary<string, string>();
+
+        if (!string.IsNullOrWhiteSpace(request.ClaveInt))
+            datosExtra["CCLAVEINT"] = request.ClaveInt;
+
+        if (!string.IsNullOrWhiteSpace(request.ClaveSat))
+            datosExtra["CCLAVESAT"] = request.ClaveSat;
+
+        if (datosExtra.Count > 0)
+        {
+            await _sdk.ActualizarUnidadMedidaAsync(request.NombreUnidad, datosExtra);
+        }
+
+        return idUnidad;
     }
 }

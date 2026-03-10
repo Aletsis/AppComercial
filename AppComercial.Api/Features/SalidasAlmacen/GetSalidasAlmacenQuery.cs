@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AppComercial.Api.Features.SalidasAlmacen;
 
 /// <summary>
-/// Consulta Documentos cuyo Concepto tiene CNATURALEZA = 5 (Salidas de Almacén).
+/// Consulta Documentos cuyo Concepto tiene CIDDOCUMENTODE = 33 (Salidas de Almacén).
 /// </summary>
 public class GetSalidasAlmacenQuery : IRequest<IEnumerable<AdmDocumentos>>
 {
@@ -27,9 +27,9 @@ public class GetSalidasAlmacenQueryHandler : IRequestHandler<GetSalidasAlmacenQu
 
     public async Task<IEnumerable<AdmDocumentos>> Handle(GetSalidasAlmacenQuery request, CancellationToken cancellationToken)
     {
-        // CNATURALEZA = 5 → Salidas de Almacén
+        // CIDDOCUMENTODE = 33 → Salidas de Almacén
         var conceptosSalida = await _dbContext.Conceptos
-            .Where(c => c.CNATURALEZA == 5)
+            .Where(c => c.CIDDOCUMENTODE == 33)
             .Select(c => c.CIDCONCEPTODOCUMENTO)
             .ToListAsync(cancellationToken);
 

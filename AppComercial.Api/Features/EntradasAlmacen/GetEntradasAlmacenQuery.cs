@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AppComercial.Api.Features.EntradasAlmacen;
 
 /// <summary>
-/// Consulta Documentos cuyo Concepto tiene CNATURALEZA = 4 (Entradas de Almacén).
+/// Consulta Documentos cuyo Concepto tiene CIDDOCUMENTODE = 32 (Entradas de Almacén).
 /// </summary>
 public class GetEntradasAlmacenQuery : IRequest<IEnumerable<AdmDocumentos>>
 {
@@ -28,9 +28,9 @@ public class GetEntradasAlmacenQueryHandler : IRequestHandler<GetEntradasAlmacen
 
     public async Task<IEnumerable<AdmDocumentos>> Handle(GetEntradasAlmacenQuery request, CancellationToken cancellationToken)
     {
-        // Obtenemos IDs de conceptos que sean Entradas de Almacén (CNATURALEZA = 4)
+        // Obtenemos IDs de conceptos que sean Entradas de Almacén (CIDDOCUMENTODE = 32)
         var conceptosEntrada = await _dbContext.Conceptos
-            .Where(c => c.CNATURALEZA == 4)
+            .Where(c => c.CIDDOCUMENTODE == 32)
             .Select(c => c.CIDCONCEPTODOCUMENTO)
             .ToListAsync(cancellationToken);
 

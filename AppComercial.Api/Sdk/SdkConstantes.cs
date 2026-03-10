@@ -14,4 +14,6 @@ public static class SdkConstantes
     public const int kLongDescripcion = 61;
     public const int kLongTextoExtra = 51;
     public const int kLongNombreProducto = 256;
+    public const int kLongSerie = 12;
+    public const int kLongReferencia = 21;
 }

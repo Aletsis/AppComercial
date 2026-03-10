@@ -69,13 +69,14 @@ public class SalidasAlmacenController : ControllerBase
     /// </summary>
     [HttpPut("{codigoConcepto}/{serie}/{folio}")]
     public async Task<ActionResult<int>> Put(
-        string codigoConcepto, string serie, string folio,
+        string codigoConcepto, string serie, string folio, 
         [FromBody] Features.SalidasAlmacen.UpdateSalidaAlmacenCommand command)
     {
         try
         {
             command.CodigoConcepto = codigoConcepto;
-            command.Serie          = serie;
+            // Si serie viene como null o "%20" o "-", lo mandamos vacío al SDK.
+            command.Serie          = string.IsNullOrWhiteSpace(serie) || serie == "-" || serie == "none" ? string.Empty : serie;
             command.Folio          = folio;
             var result = await _mediator.Send(command);
             return Ok(result);

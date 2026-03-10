@@ -1,6 +1,8 @@
 using MediatR;
 using AppComercial.Api.Sdk;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
+using AppComercial.Api.Infrastructure;
 
 namespace AppComercial.Api.Features.Productos;
 
@@ -54,12 +56,12 @@ public class CreateProductoCommand : IRequest<int>
     public int ControlExistencia { get; set; } = 0;
 
     /// <summary>
-    /// Código de la unidad de medida base del producto. Por defecto: "PIEZA".
+    /// Id de la unidad de medida base del producto. Por defecto: 1.
     /// Debe existir en el catálogo de Unidades de Medida de CONTPAQi.
-    /// Ejemplo: "PIEZA", "KG", "LT", "MT"
+    /// Ejemplo: 1, 2, 3
     /// </summary>
-    [StringLength(30, ErrorMessage = "El código de unidad base no puede exceder 30 caracteres.")]
-    public string CodigoUnidadBase { get; set; } = "PIEZA";
+    [Range(1, int.MaxValue, ErrorMessage = "El Id de la Unidad Base debe ser mayor a 0.")]
+    public int IdUnidadBase { get; set; } = 1;
 
     /// <summary>
     /// Precio de lista 1 del producto. Por defecto: 0.
@@ -78,14 +80,22 @@ public class CreateProductoCommand : IRequest<int>
 public class CreateProductoCommandHandler : IRequestHandler<CreateProductoCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly ContpaqiDbContext _context;
 
-    public CreateProductoCommandHandler(IContpaqiSdk sdk)
+    public CreateProductoCommandHandler(IContpaqiSdk sdk, ContpaqiDbContext context)
     {
         _sdk = sdk;
+        _context = context;
     }
 
     public async Task<int> Handle(CreateProductoCommand request, CancellationToken cancellationToken)
     {
+        var unidad = await _context.UnidadesMedidaPeso
+            .FirstOrDefaultAsync(u => u.Id == request.IdUnidadBase, cancellationToken);
+
+        if (unidad == null)
+            throw new Exception($"La unidad de medida con ID {request.IdUnidadBase} no existe.");
+
         var nuevoProducto = new tProducto
         {
             cCodigoProducto          = request.Codigo,
@@ -93,7 +103,7 @@ public class CreateProductoCommandHandler : IRequestHandler<CreateProductoComman
             cDescripcionProducto     = request.Descripcion,
             cTipoProducto            = request.TipoProducto,
             cControlExistencia       = request.ControlExistencia,
-            cCodigoUnidadBase        = request.CodigoUnidadBase,
+            cCodigoUnidadBase        = unidad.NombreUnidad,
             cPrecio1                 = request.Precio1,
             cImpuesto1               = request.Impuesto1,
             // Valores requeridos por el SDK que se inicializan con defaults seguros

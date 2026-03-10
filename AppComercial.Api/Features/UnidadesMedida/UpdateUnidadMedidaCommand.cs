@@ -31,6 +31,16 @@ public class UpdateUnidadMedidaCommand : IRequest<int>
     /// </summary>
     [StringLength(20, MinimumLength = 1, ErrorMessage = "El despliegue debe tener entre 1 y 20 caracteres.")]
     public string? Despliegue { get; set; }
+
+    /// <summary>
+    /// Clave SAT de la unidad. Opcional. (CCLAVEINT)
+    /// </summary>
+    public string? ClaveInt { get; set; }
+
+    /// <summary>
+    /// Clave de comercio exterior de la unidad. Opcional. (CCLAVESAT)
+    /// </summary>
+    public string? ClaveSat { get; set; }
 }
 
 public class UpdateUnidadMedidaCommandHandler : IRequestHandler<UpdateUnidadMedidaCommand, int>
@@ -52,9 +62,15 @@ public class UpdateUnidadMedidaCommandHandler : IRequestHandler<UpdateUnidadMedi
         if (!string.IsNullOrWhiteSpace(request.Despliegue))
             datos["CDESPLIEGUE"] = request.Despliegue;
 
+        if (!string.IsNullOrWhiteSpace(request.ClaveInt))
+            datos["CCLAVEINT"] = request.ClaveInt;
+
+        if (!string.IsNullOrWhiteSpace(request.ClaveSat))
+            datos["CCLAVESAT"] = request.ClaveSat;
+
         if (datos.Count == 0)
             throw new ArgumentException(
-                "Se debe proporcionar al menos un campo para actualizar: Abreviatura o Despliegue.");
+                "Se debe proporcionar al menos un campo para actualizar: Abreviatura, Despliegue, ClaveInt o ClaveSat.");
 
         return await _sdk.ActualizarUnidadMedidaAsync(request.NombreUnidad, datos);
     }

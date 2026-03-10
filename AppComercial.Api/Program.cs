@@ -27,11 +27,13 @@ builder.Services.AddDbContext<ContpaqiDbContext>(options =>
     if (string.IsNullOrEmpty(msSqlConnectionString))
     {
         // Fallback a SQL Express base predeterminada
-        options.UseSqlServer("Server=localhost\\Compac;Database=adCONTPAQi_Comercial;Trusted_Connection=True;Encrypt=False;");
+        options.UseSqlServer("Server=localhost\\Compac;Database=adCONTPAQi_Comercial;Trusted_Connection=True;Encrypt=False;",
+            options => options.UseCompatibilityLevel(120));
     }
     else 
     {
-        options.UseSqlServer(msSqlConnectionString);
+        options.UseSqlServer(msSqlConnectionString,
+            options => options.UseCompatibilityLevel(120));
     }
 });
 
@@ -42,7 +44,7 @@ builder.Services.AddDbContext<CompacWAdminDbContext>(options =>
     var connStr = string.IsNullOrEmpty(compacWAdminConnectionString)
         ? "Server=localhost\\PCOMERCIAL;Database=CompacWAdmin;Trusted_Connection=True;Encrypt=False;"
         : compacWAdminConnectionString;
-    options.UseSqlServer(connStr);
+    options.UseSqlServer(connStr, options => options.UseCompatibilityLevel(120));
 });
 
 // Registrar DbContext para RepositorioAdminPAQ (usuarios y perfiles de CONTPAQi)
@@ -52,7 +54,7 @@ builder.Services.AddDbContext<RepositorioAdminDbContext>(options =>
     var connStr = string.IsNullOrEmpty(repositorioAdminConnectionString)
         ? "Server=localhost\\PCOMERCIAL;Database=RepositorioAdminPAQ;Trusted_Connection=True;Encrypt=False;"
         : repositorioAdminConnectionString;
-    options.UseSqlServer(connStr);
+    options.UseSqlServer(connStr, options => options.UseCompatibilityLevel(120));
 });
 
 // Registrar MediatR para CQRS

@@ -1,5 +1,7 @@
 using MediatR;
 using AppComercial.Api.Sdk;
+using AppComercial.Api.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 
 namespace AppComercial.Api.Features.Movimientos;
@@ -57,39 +59,44 @@ public class UpdateMovimientoCommand : IRequest<int>
 public class UpdateMovimientoCommandHandler : IRequestHandler<UpdateMovimientoCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly ContpaqiDbContext _context;
 
-    public UpdateMovimientoCommandHandler(IContpaqiSdk sdk)
+    public UpdateMovimientoCommandHandler(IContpaqiSdk sdk, ContpaqiDbContext context)
     {
         _sdk = sdk;
+        _context = context;
     }
 
     public async Task<int> Handle(UpdateMovimientoCommand request, CancellationToken cancellationToken)
     {
+        var dbMovimiento = await _context.Movimientos.FirstOrDefaultAsync(m => m.CIDMOVIMIENTO == request.IdMovimiento, cancellationToken);
+        if (dbMovimiento == null) throw new KeyNotFoundException($"Movimiento con ID {request.IdMovimiento} no encontrado.");
+
         var datos = new Dictionary<string, string>();
 
         if (!string.IsNullOrWhiteSpace(request.CodigoProducto))
-            datos["ACODPRODSER"] = request.CodigoProducto;
+            datos["PRODUCTO"] = request.CodigoProducto;
 
         if (request.Unidades.HasValue)
-            datos["AUNIDADES"] = request.Unidades.Value.ToString("F6");
+            datos["UNIDADES"] = request.Unidades.Value.ToString("F6");
 
         if (request.Precio.HasValue)
-            datos["APRECIO"] = request.Precio.Value.ToString("F6");
+            datos["PRECIO"] = request.Precio.Value.ToString("F6");
 
         if (request.Costo.HasValue)
-            datos["ACOSTO"] = request.Costo.Value.ToString("F6");
+            datos["COSTO"] = request.Costo.Value.ToString("F6");
 
         if (!string.IsNullOrWhiteSpace(request.CodigoAlmacen))
-            datos["ACODALMACEN"] = request.CodigoAlmacen;
+            datos["ALMACEN"] = request.CodigoAlmacen;
 
         if (!string.IsNullOrWhiteSpace(request.Referencia))
-            datos["AREFERENCIA"] = request.Referencia;
+            datos["REFERENCIA"] = request.Referencia;
 
         if (datos.Count == 0)
             throw new ArgumentException(
                 "Se debe proporcionar al menos un campo para actualizar: " +
                 "CodigoProducto, Unidades, Precio, Costo, CodigoAlmacen o Referencia.");
 
-        return await _sdk.ActualizarMovimientoAsync(request.IdMovimiento, datos);
+        return await _sdk.ActualizarMovimientoAsync(dbMovimiento.CIDDOCUMENTO, request.IdMovimiento, datos);
     }
 }

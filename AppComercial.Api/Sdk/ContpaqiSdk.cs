@@ -42,7 +42,7 @@ public interface IContpaqiSdk
     Task<int> CrearMonedaAsync(Dictionary<string, string> datos);
     Task<int> ActualizarMonedaAsync(int idMoneda, Dictionary<string, string> datos);
 
-    Task<int> ActualizarMovimientoAsync(int idMovimiento, Dictionary<string, string> datos);
+    Task<int> ActualizarMovimientoAsync(int idDocumento, int idMovimiento, Dictionary<string, string> datos);
 
     Task<int> ActualizarUnidadMedidaAsync(string nombreUnidad, Dictionary<string, string> datos);
 }
@@ -353,22 +353,98 @@ public class ContpaqiSdk : IContpaqiSdk
         }
     }
 
+    [DllImport("MGWServicios.dll", EntryPoint = "fLeeDatoProducto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fLeeDatoProducto(string aCampo, StringBuilder aValor, int aLongitud);
+
     [DllImport("MGWServicios.dll", EntryPoint = "fAltaMovimiento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fAltaMovimiento(int aIdDocumento, ref int aIdMovimiento, ref tMovimiento astMovimiento);
+
+    [DllImport("MGWServicios.dll", EntryPoint = "fBuscarIdDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fBuscarIdDocumento(int aIdDocumento);
 
     public async Task<int> CrearMovimientoAsync(int idDocumento, tMovimiento movimiento)
     {
         await _sdkSemaphore.WaitAsync();
         try
         {
+            string originalProductCode = movimiento.aCodProdSer;
+            string idProductoStr = null;
+
+            // 1. OBTENER ID PRODUCTO PRIMERO
+            // Hacemos esto antes de manipular el Documento para no romper el apuntador interno (causa de 0xC0000005)
+            // Esto mueve el "cursor" del SDK a catálogo de Productos momentáneamente.
+            if (fBuscaProducto(originalProductCode) == 0)
+            {
+                StringBuilder sbId = new StringBuilder(50);
+                if (fLeeDatoProducto("CIDPRODUCTO", sbId, 50) == 0)
+                {
+                    idProductoStr = sbId.ToString();
+                }
+            }
+
+            // 2. ENFOCAR EL DOCUMENTO
+            // Cambiamos el "cursor" al documento y lo ponemos en edición para que los totales puedan afectarse.
+            var resultDoc = fBuscarIdDocumento(idDocumento);
+            if (resultDoc != 0) throw new Exception($"Documento con ID {idDocumento} no encontrado en SDK. Código: {resultDoc}");
+
+            resultDoc = fEditarDocumento();
+            if (resultDoc != 0) throw new Exception($"No se pudo iniciar la edición del Documento {idDocumento}. Código: {resultDoc}");
+
+            // 3. AGREGAR MOVIMIENTO BASE
             int nuevoId = 0;
             var result = fAltaMovimiento(idDocumento, ref nuevoId, ref movimiento);
             if (result != 0)
             {
+                fCancelarModificacionDocumento();
+                fDesbloqueaDocumento();
                 StringBuilder sb = new StringBuilder(512);
                 fError(result, sb, 512);
-                throw new Exception($"Error al agregar movimiento (partida) al documento en SDK. Código: {result} - {sb.ToString()}");
+                throw new Exception($"Error al agregar movimiento en SDK. Código: {result} - {sb.ToString()}");
             }
+
+            // 4. EDITAR CON IDENTIFICADOR SEGURO (Bypass a la separación de guiones en PR-0015)
+            if (nuevoId > 0 && !string.IsNullOrEmpty(idProductoStr))
+            {
+                // Focalizamos el cursor en el nuevo movimiento específico.
+                if (fBuscarIdMovimiento(nuevoId) == 0)
+                {
+                    var resultEditaMov = fEditarMovimiento();
+                    if (resultEditaMov == 0)
+                    {
+                        // En lugar del código con guion, mandamos el ID interno intacto.
+                        fSetDatoMovimiento("CIDPRODUCTO", idProductoStr);
+
+                        if (!string.IsNullOrEmpty(movimiento.aCodAlmacen))
+                        {
+                            fSetDatoMovimiento("ALMACEN", movimiento.aCodAlmacen);
+                        }
+
+                        // Reinscribir precio y cantidades para que el motor asimile el redibujado de la partida
+                        fSetDatoMovimiento("PRECIO", movimiento.aPrecio.ToString());
+                        fSetDatoMovimiento("UNIDADES", movimiento.aUnidades.ToString());
+
+                        var resGuardaMov = fGuardaMovimiento();
+                        if (resGuardaMov != 0)
+                        {
+                            fCancelaCambiosMovimiento();
+                        }
+                    }
+                }
+            }
+
+            // 5. GUARDAR DOCUMENTO Y DISPARAR TRIGGERS DE TOTALES
+            // Este paso consolida todo: Cuadra los impuestos y recalcula el total neto para la Base de Datos.
+            resultDoc = fGuardaDocumento();
+            if (resultDoc != 0)
+            {
+                fDesbloqueaDocumento();
+                StringBuilder sb = new StringBuilder(512);
+                fError(resultDoc, sb, 512);
+                throw new Exception($"Movimiento agregado, pero error al actualizar totales del documento. SDK: {resultDoc} - {sb.ToString()}");
+            }
+
+            fDesbloqueaDocumento();
+
             return nuevoId;
         }
         finally
@@ -498,29 +574,63 @@ public class ContpaqiSdk : IContpaqiSdk
     // IMPLEMENTACIONES FALTANTES: Creación y Edición vía fInserta / fBusca / fEdita / fGuarda
     // =========================================================================================
 
-    private async Task<int> EjecutarOperacionDictionaryAsync(Func<int> fnBuscaOInserta, Func<int> fnEdita, Func<string, string, int> fnSetDato, Func<int> fnGuarda, Dictionary<string, string> datos, string entidad)
+    private async Task<int> EjecutarOperacionDictionaryAsync(Func<int> fnBuscaOInserta, Func<int>? fnEdita, Func<string, string, int> fnSetDato, Func<int> fnGuarda, Dictionary<string, string> datos, string entidad, Action? fnCancela = null)
     {
         await _sdkSemaphore.WaitAsync();
         try
         {
             var result = fnBuscaOInserta();
-            if (result != 0) throw new Exception($"Error al buscar/insertar {entidad}. Código error: {result}");
-
-            result = fnEdita();
-            if (result != 0) throw new Exception($"Error al iniciar edición de {entidad}. Código error: {result}");
-
-            foreach (var dato in datos)
-            {
-                result = fnSetDato(dato.Key, dato.Value);
-                if (result != 0) throw new Exception($"Error al setear campo {dato.Key} en {entidad}. Código error: {result}");
-            }
-
-            result = fnGuarda();
             if (result != 0)
             {
                 StringBuilder sb = new StringBuilder(512);
                 fError(result, sb, 512);
-                throw new Exception($"Error al guardar {entidad}. Código: {result} - {sb.ToString()}");
+                throw new Exception($"Error al {(fnEdita == null ? "insertar" : "buscar")} {entidad}. Código error: {result} - {sb.ToString()}");
+            }
+
+            if (fnEdita != null)
+            {
+                result = fnEdita();
+                if (result != 0)
+                {
+                    StringBuilder sb = new StringBuilder(512);
+                    fError(result, sb, 512);
+                    throw new Exception($"Error al iniciar edición de {entidad}. Código error: {result} - {sb.ToString()}");
+                }
+            }
+
+            try
+            {
+                foreach (var dato in datos)
+                {
+                    result = fnSetDato(dato.Key, dato.Value);
+                    if (result != 0)
+                    {
+                        StringBuilder sb = new StringBuilder(512);
+                        fError(result, sb, 512);
+                        throw new Exception($"Error al setear campo '{dato.Key}' en {entidad}. Código error: {result} - {sb.ToString()}");
+                    }
+                }
+
+                result = fnGuarda();
+                if (result != 0)
+                {
+                    StringBuilder sb = new StringBuilder(512);
+                    fError(result, sb, 512);
+                    throw new Exception($"Error al guardar {entidad}. Código: {result} - {sb.ToString()}");
+                }
+            }
+            finally
+            {
+                // Unconditionally cancel the modification state to release the SQL lock and free memory
+                if (fnEdita != null && fnCancela != null)
+                {
+                    fnCancela(); // Liberar el recurso en CONTPAQi
+                }
+
+                if (entidad == "Documento")
+                {
+                     fDesbloqueaDocumento();
+                }
             }
 
             return 1;
@@ -542,12 +652,14 @@ public class ContpaqiSdk : IContpaqiSdk
     private static extern int fSetDatoAgente(string aCampo, string aValor);
     [DllImport("MGWServicios.dll", EntryPoint = "fGuardaAgente", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fGuardaAgente();
+    [DllImport("MGWServicios.dll", EntryPoint = "fCancelarModificacionAgente", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fCancelarModificacionAgente();
 
     public Task<int> CrearAgenteAsync(Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(fInsertaAgente, fEditaAgente, fSetDatoAgente, fGuardaAgente, datos, "Agente");
+        EjecutarOperacionDictionaryAsync(fInsertaAgente, null, fSetDatoAgente, fGuardaAgente, datos, "Agente");
 
     public Task<int> ActualizarAgenteAsync(string codigo, Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(() => fBuscaAgente(codigo), fEditaAgente, fSetDatoAgente, fGuardaAgente, datos, "Agente");
+        EjecutarOperacionDictionaryAsync(() => fBuscaAgente(codigo), fEditaAgente, fSetDatoAgente, fGuardaAgente, datos, "Agente", () => fCancelarModificacionAgente());
 
     // --- ALMACENES ---
     [DllImport("MGWServicios.dll", EntryPoint = "fBuscaAlmacen", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
@@ -560,18 +672,17 @@ public class ContpaqiSdk : IContpaqiSdk
     private static extern int fSetDatoAlmacen(string aCampo, string aValor);
     [DllImport("MGWServicios.dll", EntryPoint = "fGuardaAlmacen", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fGuardaAlmacen();
+    [DllImport("MGWServicios.dll", EntryPoint = "fCancelarModificacionAlmacen", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fCancelarModificacionAlmacen();
 
     public Task<int> CrearAlmacenAsync(Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(fInsertaAlmacen, fEditaAlmacen, fSetDatoAlmacen, fGuardaAlmacen, datos, "Almacen");
+        EjecutarOperacionDictionaryAsync(fInsertaAlmacen, null, fSetDatoAlmacen, fGuardaAlmacen, datos, "Almacen");
 
     public Task<int> ActualizarAlmacenAsync(string codigo, Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(() => fBuscaAlmacen(codigo), fEditaAlmacen, fSetDatoAlmacen, fGuardaAlmacen, datos, "Almacen");
+        EjecutarOperacionDictionaryAsync(() => fBuscaAlmacen(codigo), fEditaAlmacen, fSetDatoAlmacen, fGuardaAlmacen, datos, "Almacen", () => fCancelarModificacionAlmacen());
 
-    // --- CONCEPTOS ---
     [DllImport("MGWServicios.dll", EntryPoint = "fBuscaConceptoDocto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fBuscaConceptoDocto(string aCodigoConcepto);
-    [DllImport("MGWServicios.dll", EntryPoint = "fInsertaConceptoDocto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
-    private static extern int fInsertaConceptoDocto();
     [DllImport("MGWServicios.dll", EntryPoint = "fEditaConceptoDocto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fEditaConceptoDocto();
     [DllImport("MGWServicios.dll", EntryPoint = "fSetDatoConceptoDocto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
@@ -579,8 +690,12 @@ public class ContpaqiSdk : IContpaqiSdk
     [DllImport("MGWServicios.dll", EntryPoint = "fGuardaConceptoDocto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fGuardaConceptoDocto();
 
-    public Task<int> CrearConceptoAsync(Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(fInsertaConceptoDocto, fEditaConceptoDocto, fSetDatoConceptoDocto, fGuardaConceptoDocto, datos, "Concepto");
+    public Task<int> CrearConceptoAsync(Dictionary<string, string> datos)
+    {
+        // La librería MGWServicios.dll no exporta ninguna función para insertar conceptos
+        // (no existe fInsertaConceptoDocto, fAltaConceptoDocto, etc.).
+        throw new NotSupportedException("El SDK de CONTPAQi no soporta la creación de Conceptos de Documento. MGWServicios.dll no cuenta con una función fInserta... para Conceptos. Solo se soporta la lectura y edición.");
+    }
 
     public Task<int> ActualizarConceptoAsync(string codigo, Dictionary<string, string> datos) =>
         EjecutarOperacionDictionaryAsync(() => fBuscaConceptoDocto(codigo), fEditaConceptoDocto, fSetDatoConceptoDocto, fGuardaConceptoDocto, datos, "Concepto");
@@ -588,15 +703,19 @@ public class ContpaqiSdk : IContpaqiSdk
     // --- DOCUMENTOS ---
     [DllImport("MGWServicios.dll", EntryPoint = "fBuscarDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fBuscarDocumento(string aCodConcepto, string aSerie, string aFolio);
-    [DllImport("MGWServicios.dll", EntryPoint = "fEditaDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
-    private static extern int fEditaDocumento();
+    [DllImport("MGWServicios.dll", EntryPoint = "fEditarDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fEditarDocumento();
     [DllImport("MGWServicios.dll", EntryPoint = "fSetDatoDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fSetDatoDocumento(string aCampo, string aValor);
     [DllImport("MGWServicios.dll", EntryPoint = "fGuardaDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fGuardaDocumento();
+    [DllImport("MGWServicios.dll", EntryPoint = "fCancelarModificacionDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fCancelarModificacionDocumento();
+    [DllImport("MGWServicios.dll", EntryPoint = "fDesbloqueaDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fDesbloqueaDocumento();
 
     public Task<int> ActualizarDocumentoAsync(string codigoConcepto, string serie, string folio, Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(() => fBuscarDocumento(codigoConcepto, serie, folio), fEditaDocumento, fSetDatoDocumento, fGuardaDocumento, datos, "Documento");
+        EjecutarOperacionDictionaryAsync(() => fBuscarDocumento(codigoConcepto, serie, folio), fEditarDocumento, fSetDatoDocumento, fGuardaDocumento, datos, "Documento", () => fCancelarModificacionDocumento());
 
     // --- DIRECCIONES/DOMICILIOS ---
     [DllImport("MGWServicios.dll", EntryPoint = "fBuscaIdDireccion", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
@@ -607,9 +726,11 @@ public class ContpaqiSdk : IContpaqiSdk
     private static extern int fSetDatoDireccion(string aCampo, string aValor);
     [DllImport("MGWServicios.dll", EntryPoint = "fGuardaDireccion", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fGuardaDireccion();
+    [DllImport("MGWServicios.dll", EntryPoint = "fCancelarModificacionDireccion", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fCancelarModificacionDireccion();
 
     public Task<int> ActualizarDireccionAsync(int idDireccion, Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(() => fBuscaIdDireccion(idDireccion), fEditaDireccion, fSetDatoDireccion, fGuardaDireccion, datos, "Direccion");
+        EjecutarOperacionDictionaryAsync(() => fBuscaIdDireccion(idDireccion), fEditaDireccion, fSetDatoDireccion, fGuardaDireccion, datos, "Direccion", () => fCancelarModificacionDireccion());
 
     // --- MONEDAS ---
     [DllImport("MGWServicios.dll", EntryPoint = "fBuscaIdMoneda", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
@@ -624,7 +745,7 @@ public class ContpaqiSdk : IContpaqiSdk
     private static extern int fGuardaMoneda();
 
     public Task<int> CrearMonedaAsync(Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(fInsertaMoneda, fEditaMoneda, fSetDatoMoneda, fGuardaMoneda, datos, "Moneda");
+        EjecutarOperacionDictionaryAsync(fInsertaMoneda, null, fSetDatoMoneda, fGuardaMoneda, datos, "Moneda");
 
     public Task<int> ActualizarMonedaAsync(int idMoneda, Dictionary<string, string> datos) =>
         EjecutarOperacionDictionaryAsync(() => fBuscaIdMoneda(idMoneda), fEditaMoneda, fSetDatoMoneda, fGuardaMoneda, datos, "Moneda");
@@ -632,15 +753,92 @@ public class ContpaqiSdk : IContpaqiSdk
     // --- MOVIMIENTOS (PARTIDAS) ---
     [DllImport("MGWServicios.dll", EntryPoint = "fBuscarIdMovimiento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fBuscarIdMovimiento(int aIdMovimiento);
-    [DllImport("MGWServicios.dll", EntryPoint = "fEditaMovimiento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
-    private static extern int fEditaMovimiento();
+    [DllImport("MGWServicios.dll", EntryPoint = "fEditarMovimiento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fEditarMovimiento();
     [DllImport("MGWServicios.dll", EntryPoint = "fSetDatoMovimiento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fSetDatoMovimiento(string aCampo, string aValor);
     [DllImport("MGWServicios.dll", EntryPoint = "fGuardaMovimiento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fGuardaMovimiento();
+    [DllImport("MGWServicios.dll", EntryPoint = "fCancelaCambiosMovimiento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fCancelaCambiosMovimiento();
 
-    public Task<int> ActualizarMovimientoAsync(int idMovimiento, Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(() => fBuscarIdMovimiento(idMovimiento), fEditaMovimiento, fSetDatoMovimiento, fGuardaMovimiento, datos, "Movimiento");
+    public async Task<int> ActualizarMovimientoAsync(int idDocumento, int idMovimiento, Dictionary<string, string> datos)
+    {
+        await _sdkSemaphore.WaitAsync();
+        try
+        {
+            string idProductoStr = null;
+            if (datos.TryGetValue("PRODUCTO", out string originalProductCode))
+            {
+                // Buscar el ID exacto antes de enfocar documento para evitar 0xC0000005
+                if (fBuscaProducto(originalProductCode) == 0)
+                {
+                    StringBuilder sbId = new StringBuilder(50);
+                    if (fLeeDatoProducto("CIDPRODUCTO", sbId, 50) == 0)
+                    {
+                        idProductoStr = sbId.ToString();
+                        datos["CIDPRODUCTO"] = idProductoStr;
+                    }
+                }
+                // Remover el key PRODUCTO para no sobreescribir la resolución nativa
+                datos.Remove("PRODUCTO");
+            }
+
+            var resultDoc = fBuscarIdDocumento(idDocumento);
+            if (resultDoc != 0) throw new Exception($"Documento padre con ID {idDocumento} no encontrado en SDK. Código: {resultDoc}");
+
+            resultDoc = fEditarDocumento();
+            if (resultDoc != 0) throw new Exception($"No se pudo iniciar la edición del Documento {idDocumento}. Código: {resultDoc}");
+
+            var resultMov = fBuscarIdMovimiento(idMovimiento);
+            if (resultMov != 0)
+            {
+                fCancelarModificacionDocumento();
+                fDesbloqueaDocumento();
+                throw new Exception($"Movimiento con ID {idMovimiento} no encontrado. Código SDK: {resultMov}");
+            }
+
+            resultMov = fEditarMovimiento();
+            if (resultMov != 0)
+            {
+                fCancelarModificacionDocumento();
+                fDesbloqueaDocumento();
+                throw new Exception($"No se pudo iniciar la edición del Movimiento {idMovimiento}. Código SDK: {resultMov}");
+            }
+
+            foreach (var kvp in datos)
+            {
+                fSetDatoMovimiento(kvp.Key, kvp.Value);
+            }
+
+            resultMov = fGuardaMovimiento();
+            if (resultMov != 0)
+            {
+                fCancelaCambiosMovimiento();
+                fCancelarModificacionDocumento();
+                fDesbloqueaDocumento();
+                StringBuilder sb = new StringBuilder(512);
+                fError(resultMov, sb, 512);
+                throw new Exception($"Error al guardar el movimiento. Código SDK: {resultMov} - {sb.ToString()}");
+            }
+
+            resultDoc = fGuardaDocumento();
+            if (resultDoc != 0)
+            {
+                fDesbloqueaDocumento();
+                StringBuilder sb = new StringBuilder(512);
+                fError(resultDoc, sb, 512);
+                throw new Exception($"Movimiento modificado, pero error al actualizar totales del documento. SDK: {resultDoc} - {sb.ToString()}");
+            }
+
+            fDesbloqueaDocumento();
+            return idMovimiento;
+        }
+        finally
+        {
+            _sdkSemaphore.Release();
+        }
+    }
 
     // --- UNIDADES MEDIDA ---
     [DllImport("MGWServicios.dll", EntryPoint = "fBuscaUnidad", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
@@ -651,7 +849,9 @@ public class ContpaqiSdk : IContpaqiSdk
     private static extern int fSetDatoUnidad(string aCampo, string aValor);
     [DllImport("MGWServicios.dll", EntryPoint = "fGuardaUnidad", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fGuardaUnidad();
+    [DllImport("MGWServicios.dll", EntryPoint = "fCancelarModificacionUnidad", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fCancelarModificacionUnidad();
 
     public Task<int> ActualizarUnidadMedidaAsync(string nombreUnidad, Dictionary<string, string> datos) =>
-        EjecutarOperacionDictionaryAsync(() => fBuscaUnidad(nombreUnidad), fEditaUnidad, fSetDatoUnidad, fGuardaUnidad, datos, "Unidad");
+        EjecutarOperacionDictionaryAsync(() => fBuscaUnidad(nombreUnidad), fEditaUnidad, fSetDatoUnidad, fGuardaUnidad, datos, "Unidad", () => fCancelarModificacionUnidad());
 }

@@ -13,8 +13,6 @@ public class CreateEntradaAlmacenCommand : IRequest<int>
     public string CodigoConcepto { get; set; } = string.Empty;
     public string Serie { get; set; } = string.Empty;
     public string Referencia { get; set; } = string.Empty;
-    /// <summary>Código del almacén destino donde entran los productos.</summary>
-    public string CodigoAlmacen { get; set; } = string.Empty;
     /// <summary>Lista de partidas/productos que entran al almacén.</summary>
     public List<EntradaPartida> Partidas { get; set; } = new();
 }
@@ -22,6 +20,8 @@ public class CreateEntradaAlmacenCommand : IRequest<int>
 public class EntradaPartida
 {
     public string CodigoProducto { get; set; } = string.Empty;
+    /// <summary>Código del almacén destino donde entran los productos.</summary>
+    public string CodigoAlmacen { get; set; } = string.Empty;
     public double Unidades { get; set; }
     /// <summary>Costo unitario del producto para esta entrada.</summary>
     public double Costo { get; set; }
@@ -62,7 +62,7 @@ public class CreateEntradaAlmacenCommandHandler : IRequestHandler<CreateEntradaA
                 aUnidades            = partida.Unidades,
                 aCosto               = partida.Costo,
                 aPrecio              = partida.Costo,   // En entradas, precio = costo
-                aCodAlmacen          = request.CodigoAlmacen,
+                aCodAlmacen          = partida.CodigoAlmacen,
                 aReferencia          = string.Empty,
                 aCodClasificacion    = string.Empty
             };
