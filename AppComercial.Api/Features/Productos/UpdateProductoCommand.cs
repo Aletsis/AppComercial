@@ -1,6 +1,9 @@
-using MediatR;
+using AppComercial.Api.Features.Productos;
 using AppComercial.Api.Sdk;
+using MediatR;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
+using AppComercial.Api.Infrastructure;
 
 namespace AppComercial.Api.Features.Productos;
 
@@ -72,15 +75,51 @@ public class UpdateProductoCommand : IRequest<int>
     /// </summary>
     [StringLength(50, ErrorMessage = "TextoExtra3 no puede exceder 50 caracteres.")]
     public string? TextoExtra3 { get; set; }
+
+    /// <summary>
+    /// Clasificación 1 (Departamento). Código del valor de clasificación.
+    /// </summary>
+    [StringLength(30, ErrorMessage = "La clasificación 1 no puede exceder 30 caracteres.")]
+    public string? Clasificacion1 { get; set; }
+
+    /// <summary>
+    /// Clasificación 2 (Código de barras). Código del valor de clasificación.
+    /// </summary>
+    [StringLength(30, ErrorMessage = "La clasificación 2 no puede exceder 30 caracteres.")]
+    public string? Clasificacion2 { get; set; }
+
+    /// <summary>
+    /// Clasificación 5 (Tipo de producto). Código del valor de clasificación.
+    /// </summary>
+    [StringLength(30, ErrorMessage = "La clasificación 5 no puede exceder 30 caracteres.")]
+    public string? Clasificacion5 { get; set; }
+
+    /// <summary>
+    /// Código SAT del producto (Clave SAT).
+    /// </summary>
+    [StringLength(20, ErrorMessage = "El código SAT no puede exceder 20 caracteres.")]
+    public string? CodigoSat { get; set; }
+
+    /// <summary>
+    /// Id de la unidad dentro del XML. Se asume que es el ID interno.
+    /// </summary>
+    public int? IdUnidadXml { get; set; }
+
+    /// <summary>
+    /// Id de la unidad de medida base del producto. Opcional.
+    /// </summary>
+    public int? IdUnidadBase { get; set; }
 }
 
 public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly ContpaqiDbContext _context;
 
-    public UpdateProductoCommandHandler(IContpaqiSdk sdk)
+    public UpdateProductoCommandHandler(IContpaqiSdk sdk, ContpaqiDbContext context)
     {
         _sdk = sdk;
+        _context = context;
     }
 
     public async Task<int> Handle(UpdateProductoCommand request, CancellationToken cancellationToken)
@@ -114,11 +153,34 @@ public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoComman
         if (!string.IsNullOrWhiteSpace(request.TextoExtra3))
             datos["CTEXTOEXTRA3"] = request.TextoExtra3;
 
+        if (!string.IsNullOrWhiteSpace(request.Clasificacion1))
+            datos["CCODIGOVALORCLASIFICACION1"] = request.Clasificacion1;
+
+        if (!string.IsNullOrWhiteSpace(request.Clasificacion2))
+            datos["CCODIGOVALORCLASIFICACION2"] = request.Clasificacion2;
+
+        if (!string.IsNullOrWhiteSpace(request.Clasificacion5))
+            datos["CCODIGOVALORCLASIFICACION5"] = request.Clasificacion5;
+
+        if (!string.IsNullOrWhiteSpace(request.CodigoSat))
+            datos["CCLAVESAT"] = request.CodigoSat;
+
+        if (request.IdUnidadXml.HasValue)
+            datos["CIDUNIXML"] = request.IdUnidadXml.Value.ToString();
+
+        if (request.IdUnidadBase.HasValue)
+        {
+            var unidad = await _context.UnidadesMedidaPeso
+                .FirstOrDefaultAsync(u => u.Id == request.IdUnidadBase.Value, cancellationToken);
+            if (unidad != null)
+                datos["CCODIGOUNIDADBASE"] = unidad.NombreUnidad;
+        }
+
         if (datos.Count == 0)
             throw new ArgumentException(
                 "Se debe proporcionar al menos un campo para actualizar: " +
                 "Nombre, Descripcion, TipoProducto, ControlExistencia, " +
-                "Precio1, Impuesto1, TextoExtra1, TextoExtra2 o TextoExtra3.");
+                "Precio1, Impuesto1, TextoExtra1-3, Clasificacion1, 2, 5, CodigoSat, IdUnidadXml o IdUnidadBase.");
 
         return await _sdk.ActualizarProductoAsync(request.Codigo, datos);
     }

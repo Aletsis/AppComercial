@@ -75,6 +75,35 @@ public class CreateProductoCommand : IRequest<int>
     /// </summary>
     [Range(0, 100, ErrorMessage = "El impuesto 1 debe ser un porcentaje entre 0 y 100.")]
     public double Impuesto1 { get; set; } = 0;
+
+    /// <summary>
+    /// Clasificación 1 (Departamento). Código del valor de clasificación.
+    /// </summary>
+    [StringLength(30, ErrorMessage = "La clasificación 1 no puede exceder 30 caracteres.")]
+    public string? Clasificacion1 { get; set; }
+
+    /// <summary>
+    /// Clasificación 2 (Código de barras). Código del valor de clasificación.
+    /// </summary>
+    [StringLength(30, ErrorMessage = "La clasificación 2 no puede exceder 30 caracteres.")]
+    public string? Clasificacion2 { get; set; }
+
+    /// <summary>
+    /// Clasificación 5 (Tipo de producto). Código del valor de clasificación.
+    /// </summary>
+    [StringLength(30, ErrorMessage = "La clasificación 5 no puede exceder 30 caracteres.")]
+    public string? Clasificacion5 { get; set; }
+
+    /// <summary>
+    /// Código SAT del producto (Clave SAT).
+    /// </summary>
+    [StringLength(20, ErrorMessage = "El código SAT no puede exceder 20 caracteres.")]
+    public string? CodigoSat { get; set; }
+
+    /// <summary>
+    /// Id de la unidad dentro del XML. Se asume que es el ID interno.
+    /// </summary>
+    public int? IdUnidadXml { get; set; }
 }
 
 public class CreateProductoCommandHandler : IRequestHandler<CreateProductoCommand, int>
@@ -113,11 +142,31 @@ public class CreateProductoCommandHandler : IRequestHandler<CreateProductoComman
             cNombreCaracteristica1   = string.Empty,
             cNombreCaracteristica2   = string.Empty,
             cNombreCaracteristica3   = string.Empty,
+            cCodigoValorClasificacion1 = request.Clasificacion1 ?? string.Empty,
+            cCodigoValorClasificacion2 = request.Clasificacion2 ?? string.Empty,
+            cCodigoValorClasificacion3 = string.Empty,
+            cCodigoValorClasificacion4 = string.Empty,
+            cCodigoValorClasificacion5 = request.Clasificacion5 ?? string.Empty,
+            cCodigoValorClasificacion6 = string.Empty,
             cTextoExtra1             = string.Empty,
             cTextoExtra2             = string.Empty,
             cTextoExtra3             = string.Empty,
         };
 
-        return await _sdk.CrearProductoAsync(nuevoProducto);
+        var nuevoId = await _sdk.CrearProductoAsync(nuevoProducto);
+
+        var datosExtra = new Dictionary<string, string>();
+        if (!string.IsNullOrWhiteSpace(request.CodigoSat))
+            datosExtra["CCLAVESAT"] = request.CodigoSat;
+
+        if (request.IdUnidadXml.HasValue)
+            datosExtra["CIDUNIXML"] = request.IdUnidadXml.Value.ToString();
+
+        if (datosExtra.Count > 0)
+        {
+            await _sdk.ActualizarProductoAsync(request.Codigo, datosExtra);
+        }
+
+        return nuevoId;
     }
 }
