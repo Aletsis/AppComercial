@@ -1,6 +1,7 @@
 using AppComercial.Api.Features.EntradasAlmacen;
 using AppComercial.Api.Models;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppComercial.Api.Controllers;
@@ -9,6 +10,7 @@ namespace AppComercial.Api.Controllers;
 /// Endpoints para Entradas de Almacén (Conceptos con CNATURALEZA = 4).
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class EntradasAlmacenController : ControllerBase
 {

@@ -24,10 +24,12 @@ public class ContpaqiHostedService : IHostedService
         try
         {
             var rutaEmpresa = _config["Contpaqi:DirectorioEmpresa"] ?? @"C:\Compac\Empresas\adCONTPAQi_Comercial";
+            var usuarioGlobal = _config["Contpaqi:Usuario"] ?? "SUPERVISOR";
+            var passwordGlobal = _config["Contpaqi:Contrasena"] ?? "";
 
             // Inicia la sesión global con el SDK. Requiere que COM interop cargue MGW10008.dll
-            await _sdk.IniciarSesionAsync("SUPERVISOR");
-            _logger.LogInformation("Sesión iniciada correctamente.");
+            await _sdk.IniciarSesionAsync(usuarioGlobal, passwordGlobal);
+            _logger.LogInformation("Sesión iniciada correctamente con usuario: {Usuario}", usuarioGlobal);
 
             // Abre la empresa por defecto
             await _sdk.AbrirEmpresaAsync(rutaEmpresa);
@@ -47,8 +49,17 @@ public class ContpaqiHostedService : IHostedService
             await _sdk.CerrarEmpresaAsync();
             // Evitamos llamar a _sdk.TerminarSesion() porque en ASP.NET Core causa 
             // una excepcion C0000005 (Access Violation) durante el DLL_PROCESS_DETACH de MGW000.DLL.
-            // Al cerrarse el proceso, Windows liberará los recursos automáticamente.
-            // await _sdk.TerminarSesionAsync();
+            
+            // HACK CONTPAQi: Incluso sin llamar a TerminarSesion, el Recolector de Basura 
+            // intentará desasignar la memoria no administrada de COM, detonando el error C0000005 
+            // y sacando una ventana de advertencia de Windows en el servidor (lo cual pausa todo).
+            // La mejor solución heredada para esto en .NET es matar el proceso al instante, dejando 
+            // que Windows Kernel limpie los recursos para evitar el enganche en DLL_PROCESS_DETACH.
+            _logger.LogWarning("Forzando apagado del proceso para evitar choque de memoria con MGW000.dll...");
+            
+            // Da 500ms para que se escriban los últimos logs antes del "suicidio"
+            await Task.Delay(500, cancellationToken);
+            System.Diagnostics.Process.GetCurrentProcess().Kill();
         }
         catch (Exception ex)
         {

@@ -37,7 +37,20 @@ public class GetClientesQueryHandler : IRequestHandler<GetClientesQuery, IEnumer
 
         if (request.TipoCliente.HasValue)
         {
-            query = query.Where(c => c.CTIPOCLIENTE == request.TipoCliente.Value);
+            if (request.TipoCliente.Value == 1)
+            {
+                // Si piden Clientes, devolvemos Clientes (1) y Clientes/Proveedores (2)
+                query = query.Where(c => c.CTIPOCLIENTE == 1 || c.CTIPOCLIENTE == 2);
+            }
+            else if (request.TipoCliente.Value == 3)
+            {
+                // Si piden Proveedores, devolvemos Proveedores (3) y Clientes/Proveedores (2)
+                query = query.Where(c => c.CTIPOCLIENTE == 3 || c.CTIPOCLIENTE == 2);
+            }
+            else
+            {
+                query = query.Where(c => c.CTIPOCLIENTE == request.TipoCliente.Value);
+            }
         }
 
         return await query.ToListAsync(cancellationToken);

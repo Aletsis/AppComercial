@@ -1,7 +1,6 @@
 using MediatR;
 using AppComercial.Api.Models;
-using AppComercial.Api.Infrastructure;
-using Microsoft.EntityFrameworkCore;
+using AppComercial.Api.Infrastructure.Repositories;
 
 namespace AppComercial.Api.Features.Productos;
 
@@ -13,27 +12,15 @@ public class GetProductosQuery : IRequest<IEnumerable<AdmProductos>>
 
 public class GetProductosQueryHandler : IRequestHandler<GetProductosQuery, IEnumerable<AdmProductos>>
 {
-    private readonly ContpaqiDbContext _dbContext;
+    private readonly IProductoRepository _productoRepository;
 
-    public GetProductosQueryHandler(ContpaqiDbContext dbContext)
+    public GetProductosQueryHandler(IProductoRepository productoRepository)
     {
-        _dbContext = dbContext;
+        _productoRepository = productoRepository;
     }
 
     public async Task<IEnumerable<AdmProductos>> Handle(GetProductosQuery request, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Productos.AsNoTracking();
-
-        if (!string.IsNullOrEmpty(request.Codigo))
-        {
-            query = query.Where(c => c.CCODIGOPRODUCTO == request.Codigo);
-        }
-
-        if (request.TipoProducto.HasValue)
-        {
-            query = query.Where(c => c.CTIPOPRODUCTO == request.TipoProducto.Value);
-        }
-
-        return await query.ToListAsync(cancellationToken);
+        return await _productoRepository.GetByFiltersAsync(request.Codigo, request.TipoProducto);
     }
 }

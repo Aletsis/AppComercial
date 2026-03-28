@@ -1,6 +1,8 @@
 using AppComercial.Api.Features.Compras;
 using AppComercial.Api.Models;
+using AppComercial.Api.Sdk;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppComercial.Api.Controllers;
@@ -9,14 +11,21 @@ namespace AppComercial.Api.Controllers;
 /// Endpoints para Compras (Conceptos con CNATURALEZA = 2).
 /// </summary>
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class ComprasController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly ILogger<ComprasController> _logger;
+    private readonly IContpaqiSdk _sdk;
+    private readonly IConfiguration _config;
 
-    public ComprasController(IMediator mediator)
+    public ComprasController(IMediator mediator, ILogger<ComprasController> logger, IContpaqiSdk sdk, IConfiguration config)
     {
         _mediator = mediator;
+        _logger = logger;
+        _sdk = sdk;
+        _config = config;
     }
 
     /// <summary>
@@ -85,6 +94,34 @@ public class ComprasController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al actualizar la compra en el SDK: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Genera y descarga el PDF de una Compra usando la forma impresa configurada en CONTPAQi.
+    /// Usar "-" como serie si el documento no tiene serie.
+    /// </summary>
+    [HttpGet("{codigoConcepto}/{serie}/{folio}/pdf")]
+    public async Task<IActionResult> GetPdf(string codigoConcepto, string serie, double folio)
+    {
+        try
+        {
+            var rutaEmpresa = _config["Contpaqi:DirectorioEmpresa"]
+                ?? throw new InvalidOperationException("Contpaqi:DirectorioEmpresa no configurado.");
+
+            if (serie == "-" || serie == "none") serie = string.Empty;
+
+            _logger.LogInformation("Generando PDF para Compra: {Concepto}/{Serie}/{Folio}", codigoConcepto, serie, folio);
+
+            string rutaPdf = await _sdk.GenerarPdfAsync(codigoConcepto, serie, folio, rutaEmpresa);
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(rutaPdf);
+            return File(bytes, "application/pdf", $"{codigoConcepto}{serie}{folio}.pdf");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al generar PDF para Compra {Concepto}/{Serie}/{Folio}", codigoConcepto, serie, folio);
+            return StatusCode(500, new { Message = "Error al generar el PDF", Detalle = ex.Message });
         }
     }
 }

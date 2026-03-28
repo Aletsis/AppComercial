@@ -26,6 +26,11 @@ public class CreateCompraCommand : IRequest<int>
     public string Serie { get; set; } = string.Empty;
 
     /// <summary>
+    /// Folio del documento. Opcional. Si se envía 0, CONTPAQi asignará el siguiente folio automático consecutivo.
+    /// </summary>
+    public double Folio { get; set; } = 0;
+
+    /// <summary>
     /// Código del proveedor al que se realiza la compra. Requerido.
     /// Ejemplo: "PROV001"
     /// </summary>
@@ -39,6 +44,11 @@ public class CreateCompraCommand : IRequest<int>
     /// </summary>
     [StringLength(30, ErrorMessage = "La referencia no puede exceder 30 caracteres.")]
     public string Referencia { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Observaciones o comentarios sobre la compra. Opcional.
+    /// </summary>
+    public string Observaciones { get; set; } = string.Empty;
 
     /// <summary>
     /// Código del almacén destino donde entran las mercancías compradas. Requerido.
@@ -110,6 +120,7 @@ public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, i
         {
             aCodConcepto   = request.CodigoConcepto,
             aSerie         = request.Serie,
+            aFolio         = request.Folio,
             aCodigoCteProv = request.CodigoProveedor,
             aReferencia    = request.Referencia,
             aFecha         = DateTime.Now.ToString("MM/dd/yyyy"),
@@ -118,6 +129,16 @@ public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, i
         };
 
         var idDocumento = await _sdk.CrearDocumentoAsync(documento);
+
+        // Si hay observaciones, actualizar el documento para inyectarlas
+        if (!string.IsNullOrWhiteSpace(request.Observaciones))
+        {
+            var datosEdicion = new Dictionary<string, string>
+            {
+                { "COBSERVACIONES", request.Observaciones }
+            };
+            await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, datosEdicion);
+        }
 
         // 2. Agregar las partidas de compra (movimientos)
         foreach (var partida in request.Partidas)

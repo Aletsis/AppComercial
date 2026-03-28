@@ -286,5 +286,11 @@ public class AdmDocumentos
     [Column("CIDAPERTURA")]
     public int CIDAPERTURA { get; set; }
 
+    [NotMapped]
+    [System.Text.Json.Serialization.JsonPropertyName("ccodigoconcepto")]
+    public string? CCODIGOCONCEPTO { get; set; }
 
+    [NotMapped]
+    [System.Text.Json.Serialization.JsonPropertyName("cidalmacen")]
+    public int? CIDALMACEN { get; set; }
 }

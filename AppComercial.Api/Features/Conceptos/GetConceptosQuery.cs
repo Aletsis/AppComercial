@@ -22,18 +22,28 @@ public class GetConceptosQueryHandler : IRequestHandler<GetConceptosQuery, IEnum
 
     public async Task<IEnumerable<AdmConceptos>> Handle(GetConceptosQuery request, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Conceptos.AsNoTracking();
+        var query = from c in _dbContext.Conceptos.AsNoTracking()
+                    join a in _dbContext.Almacenes.AsNoTracking() on c.CIDALMASUM equals a.CIDALMACEN into joined
+                    from al in joined.DefaultIfEmpty()
+                    select new { c, CodigoAlm = al != null ? al.CCODIGOALMACEN : "" };
 
         if (!string.IsNullOrEmpty(request.Codigo))
         {
-            query = query.Where(c => c.CCODIGOCONCEPTO == request.Codigo);
+            query = query.Where(x => x.c.CCODIGOCONCEPTO == request.Codigo);
         }
 
         if (request.TipoDocumento.HasValue)
         {
-            query = query.Where(c => c.CIDDOCUMENTODE == request.TipoDocumento.Value);
+            query = query.Where(x => x.c.CIDDOCUMENTODE == request.TipoDocumento.Value);
         }
 
-        return await query.ToListAsync(cancellationToken);
+        var results = await query.ToListAsync(cancellationToken);
+        
+        foreach (var item in results)
+        {
+            item.c.CCODIGOALMACEN = item.CodigoAlm;
+        }
+
+        return results.Select(x => x.c);
     }
 }

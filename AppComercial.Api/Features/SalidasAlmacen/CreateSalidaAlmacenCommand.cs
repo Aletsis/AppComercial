@@ -33,6 +33,11 @@ public class CreateSalidaAlmacenCommand : IRequest<int>
     public string Referencia { get; set; } = string.Empty;
 
     /// <summary>
+    /// Observaciones o comentarios largos sobre el documento. Opcional.
+    /// </summary>
+    public string Observaciones { get; set; } = string.Empty;
+
+    /// <summary>
     /// Lista de productos que salen del almacén. Se requiere al menos una partida.
     /// </summary>
     [MinLength(1, ErrorMessage = "La salida de almacén debe tener al menos una partida.")]
@@ -91,6 +96,16 @@ public class CreateSalidaAlmacenCommandHandler : IRequestHandler<CreateSalidaAlm
         };
 
         var idDocumento = await _sdk.CrearDocumentoAsync(documento);
+
+        // Si hay observaciones, actualizar el documento para inyectarlas
+        if (!string.IsNullOrWhiteSpace(request.Observaciones))
+        {
+            var datosEdicion = new Dictionary<string, string>
+            {
+                { "COBSERVACIONES", request.Observaciones }
+            };
+            await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, datosEdicion);
+        }
 
         // 2. Agregar cada partida al documento
         foreach (var partida in request.Partidas)

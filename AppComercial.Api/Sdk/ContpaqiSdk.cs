@@ -36,6 +36,7 @@ public interface IContpaqiSdk
     Task<int> ActualizarConceptoAsync(string codigo, Dictionary<string, string> datos);
 
     Task<int> ActualizarDocumentoAsync(string codigoConcepto, string serie, string folio, Dictionary<string, string> datos);
+    Task<int> ActualizarDocumentoPorIdAsync(int idDocumento, Dictionary<string, string> datos);
 
     Task<int> ActualizarDireccionAsync(int idDireccion, Dictionary<string, string> datos);
 
@@ -45,6 +46,20 @@ public interface IContpaqiSdk
     Task<int> ActualizarMovimientoAsync(int idDocumento, int idMovimiento, Dictionary<string, string> datos);
 
     Task<int> ActualizarUnidadMedidaAsync(string nombreUnidad, Dictionary<string, string> datos);
+
+    /// <summary>
+    /// Valida las credenciales de un usuario contra el motor nativo de CONTPAQi Comercial.
+    /// Usa fInicioSesionSDK internamente y restaura la sesión de SUPERVISOR si falla.
+    /// Devuelve true si el usuario y contraseña son válidos.
+    /// </summary>
+    Task<bool> ValidarCredencialesAsync(string usuario, string contrasena, string rutaEmpresa);
+
+    /// <summary>
+    /// Genera un PDF del documento usando la forma impresa configurada en el concepto de CONTPAQi.
+    /// El PDF se guarda en [DirectorioEmpresa]/XML_SDK/{serie}{folio}.pdf
+    /// </summary>
+    /// <returns>Ruta completa del archivo PDF generado en el servidor.</returns>
+    Task<string> GenerarPdfAsync(string codigoConcepto, string serie, double folio, string rutaEmpresa);
 }
 
 public class ContpaqiSdk : IContpaqiSdk
@@ -121,6 +136,42 @@ public class ContpaqiSdk : IContpaqiSdk
             {
                 throw new Exception($"Error al iniciar el SDK nativo de Comercial. Código de error: {result}");
             }
+        }
+        finally
+        {
+            _sdkSemaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Valida las credenciales de un usuario usando el motor nativo de CONTPAQi.
+    /// Estrategia: intenta iniciar sesión con las credenciales dadas. Si fSetNombrePAQ devuelve 0,
+    /// las credenciales son válidas. Siempre restaura la sesión de SUPERVISOR al terminar.
+    /// </summary>
+    public async Task<bool> ValidarCredencialesAsync(string usuario, string contrasena, string rutaEmpresa)
+    {
+        await _sdkSemaphore.WaitAsync();
+        try
+        {
+            SetDirectorioBinariosSDK();
+
+            // Intentar sesión con las credenciales del usuario
+            fInicioSesionSDK(usuario, contrasena);
+            int result = fSetNombrePAQ("CONTPAQ I COMERCIAL");
+            bool credencialesValidas = (result == 0);
+
+            if (credencialesValidas)
+            {
+                // Abrir empresa para dejar el SDK en estado consistente
+                fAbreEmpresa(rutaEmpresa);
+            }
+
+            // SIEMPRE restaurar la sesión de SUPERVISOR para no interrumpir otras operaciones
+            fInicioSesionSDK("SUPERVISOR", "");
+            fSetNombrePAQ("CONTPAQ I COMERCIAL");
+            fAbreEmpresa(rutaEmpresa);
+
+            return credencialesValidas;
         }
         finally
         {
@@ -252,6 +303,9 @@ public class ContpaqiSdk : IContpaqiSdk
     [DllImport("MGWServicios.dll", EntryPoint = "fAltaProducto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fAltaProducto(ref int aIdProducto, ref tProducto astProducto);
 
+    [DllImport("MGWServicios.dll", EntryPoint = "fCancelarModificacionProducto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fCancelarModificacionProducto();
+
     [DllImport("MGWServicios.dll", EntryPoint = "fError", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern void fError(int aNumeroError, StringBuilder aMensaje, int aLongitud);
 
@@ -305,20 +359,34 @@ public class ContpaqiSdk : IContpaqiSdk
             if (result != 0) throw new Exception($"Producto no encontrado. Código error: {result}");
 
             result = fEditaProducto();
-            if (result != 0) throw new Exception($"Error al iniciar edición del producto. Código error: {result}");
-
-            foreach (var dato in datos)
-            {
-                result = fSetDatoProducto(dato.Key, dato.Value);
-                if (result != 0) throw new Exception($"Error al setear campo {dato.Key}. Código error: {result}");
-            }
-
-            result = fGuardaProducto();
             if (result != 0)
             {
                 StringBuilder sb = new StringBuilder(512);
                 fError(result, sb, 512);
-                throw new Exception($"Error SDK al actualizar producto {result}: {sb.ToString()}");
+                fCancelarModificacionProducto(); // En caso de que se haya quedado tomado
+                throw new Exception($"Error al iniciar edición del producto. Código error: {result} - {sb.ToString()}");
+            }
+
+            try
+            {
+                foreach (var dato in datos)
+                {
+                    result = fSetDatoProducto(dato.Key, dato.Value);
+                    if (result != 0) throw new Exception($"Error al setear campo {dato.Key}. Código error: {result}");
+                }
+
+                result = fGuardaProducto();
+                if (result != 0)
+                {
+                    StringBuilder sb = new StringBuilder(512);
+                    fError(result, sb, 512);
+                    throw new Exception($"Error SDK al actualizar producto {result}: {sb.ToString()}");
+                }
+            }
+            catch
+            {
+                fCancelarModificacionProducto();
+                throw;
             }
 
             return 1;
@@ -329,8 +397,55 @@ public class ContpaqiSdk : IContpaqiSdk
         }
     }
 
+    [DllImport("MGWServicios.dll", EntryPoint = "fEntregEnDiscoXML", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fEntregEnDiscoXML(string aCodConcepto, string aSerie, double aFolio, int aTipoArchivo, string aRutaPlantilla);
+
     [DllImport("MGWServicios.dll", EntryPoint = "fAltaDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fAltaDocumento(ref int aIdDocumento, ref tDocumento astDocumento);
+
+    public async Task<string> GenerarPdfAsync(string codigoConcepto, string serie, double folio, string rutaEmpresa)
+    {
+        await _sdkSemaphore.WaitAsync();
+        try
+        {
+            // tipoArchivo = 1 → PDF (0 = XML)
+            var result = fEntregEnDiscoXML(codigoConcepto, serie ?? string.Empty, folio, 1, string.Empty);
+            if (result != 0)
+            {
+                StringBuilder sb = new StringBuilder(512);
+                fError(result, sb, 512);
+                throw new Exception($"Error al generar PDF en SDK. Código: {result} - {sb}");
+            }
+
+            // CONTPAQi generates: [Concept][Serie][Folio].pdf
+            // However, fEntregEnDiscoXML uses various padding conventions.
+            string dirArchivoDigital = Path.Combine(rutaEmpresa, "XML_SDK");
+            string sConcepto = (codigoConcepto ?? "").Trim();
+            string sSerie = (serie ?? "").Trim();
+            string sFolio = folio.ToString("0");
+
+            // Look for files ending with [Folio].pdf that contain nuestra Serie o Concepto
+            string rutaArchivo = Directory.GetFiles(dirArchivoDigital, $"*{sFolio}.pdf")
+                .Where(f => {
+                    var name = Path.GetFileName(f);
+                    bool matchConcepto = !string.IsNullOrEmpty(sConcepto) && name.StartsWith(sConcepto);
+                    bool matchSerie = !string.IsNullOrEmpty(sSerie) && name.Contains(sSerie);
+                    // Si no pedimos serie, al menos que coincida el concepto
+                    return matchConcepto || matchSerie;
+                })
+                .OrderByDescending(f => File.GetLastWriteTime(f))
+                .FirstOrDefault();
+
+            if (rutaArchivo == null || !File.Exists(rutaArchivo))
+                throw new FileNotFoundException($"El PDF fue generado por el SDK pero no se pudo encontrar en {dirArchivoDigital}. Patrón: *{sFolio}.pdf");
+
+            return rutaArchivo;
+        }
+        finally
+        {
+            _sdkSemaphore.Release();
+        }
+    }
 
     public async Task<int> CrearDocumentoAsync(tDocumento documento)
     {
@@ -716,6 +831,9 @@ public class ContpaqiSdk : IContpaqiSdk
 
     public Task<int> ActualizarDocumentoAsync(string codigoConcepto, string serie, string folio, Dictionary<string, string> datos) =>
         EjecutarOperacionDictionaryAsync(() => fBuscarDocumento(codigoConcepto, serie, folio), fEditarDocumento, fSetDatoDocumento, fGuardaDocumento, datos, "Documento", () => fCancelarModificacionDocumento());
+
+    public Task<int> ActualizarDocumentoPorIdAsync(int idDocumento, Dictionary<string, string> datos) =>
+        EjecutarOperacionDictionaryAsync(() => fBuscarIdDocumento(idDocumento), fEditarDocumento, fSetDatoDocumento, fGuardaDocumento, datos, "Documento", () => fCancelarModificacionDocumento());
 
     // --- DIRECCIONES/DOMICILIOS ---
     [DllImport("MGWServicios.dll", EntryPoint = "fBuscaIdDireccion", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]

@@ -13,6 +13,7 @@ public class CreateEntradaAlmacenCommand : IRequest<int>
     public string CodigoConcepto { get; set; } = string.Empty;
     public string Serie { get; set; } = string.Empty;
     public string Referencia { get; set; } = string.Empty;
+    public string Observaciones { get; set; } = string.Empty;
     /// <summary>Lista de partidas/productos que entran al almacén.</summary>
     public List<EntradaPartida> Partidas { get; set; } = new();
 }
@@ -51,6 +52,16 @@ public class CreateEntradaAlmacenCommandHandler : IRequestHandler<CreateEntradaA
         };
 
         var idDocumento = await _sdk.CrearDocumentoAsync(documento);
+
+        // Si hay observaciones, actualizar el documento para inyectarlas
+        if (!string.IsNullOrWhiteSpace(request.Observaciones))
+        {
+            var datosEdicion = new Dictionary<string, string>
+            {
+                { "COBSERVACIONES", request.Observaciones }
+            };
+            await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, datosEdicion);
+        }
 
         // 2. Agregar cada partida (movimiento de inventario)
         foreach (var partida in request.Partidas)

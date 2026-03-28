@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace AppComercial.Api.Models;
 
@@ -601,8 +602,7 @@ public class AdmConceptos
     [Column("CUSAOBJIMP")]
     public int CUSAOBJIMP { get; set; }
 
-    [Column("CCONFIEPS")]
-    public int CCONFIEPS { get; set; }
-
-
+    [NotMapped]
+    [JsonPropertyName("ccodigoalmacen")]
+    public string? CCODIGOALMACEN { get; set; }
 }

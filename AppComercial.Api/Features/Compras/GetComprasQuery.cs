@@ -28,9 +28,9 @@ public class GetComprasQueryHandler : IRequestHandler<GetComprasQuery, IEnumerab
 
     public async Task<IEnumerable<AdmDocumentos>> Handle(GetComprasQuery request, CancellationToken cancellationToken)
     {
-        // CNATURALEZA = 2 → Compras
+        // CIDDOCUMENTODE = 19 → Compras
         var conceptosCompra = await _dbContext.Conceptos
-            .Where(c => c.CNATURALEZA == 2)
+            .Where(c => c.CIDDOCUMENTODE == 19)
             .Select(c => c.CIDCONCEPTODOCUMENTO)
             .ToListAsync(cancellationToken);
 
@@ -40,10 +40,13 @@ public class GetComprasQueryHandler : IRequestHandler<GetComprasQuery, IEnumerab
 
         if (!string.IsNullOrEmpty(request.CodigoConcepto))
         {
+            // CCODIGOCONCEPTO en la tabla puede tener trailing spaces
+            var requestedCode = request.CodigoConcepto.Trim();
             var idConcepto = await _dbContext.Conceptos
-                .Where(c => c.CCODIGOCONCEPTO == request.CodigoConcepto)
+                .Where(c => c.CCODIGOCONCEPTO != null && c.CCODIGOCONCEPTO.Trim() == requestedCode)
                 .Select(c => c.CIDCONCEPTODOCUMENTO)
                 .FirstOrDefaultAsync(cancellationToken);
+                
             query = query.Where(d => d.CIDCONCEPTODOCUMENTO == idConcepto);
         }
 
@@ -59,6 +62,19 @@ public class GetComprasQueryHandler : IRequestHandler<GetComprasQuery, IEnumerab
         if (request.ProveedorId.HasValue)
             query = query.Where(d => d.CIDCLIENTEPROVEEDOR == request.ProveedorId.Value);
 
-        return await query.OrderByDescending(d => d.CFECHA).Take(100).ToListAsync(cancellationToken);
+        var rawResults = await (from d in query
+                                 join c in _dbContext.Conceptos.AsNoTracking() on d.CIDCONCEPTODOCUMENTO equals c.CIDCONCEPTODOCUMENTO
+                                 select new { d, ConceptoCodigo = c.CCODIGOCONCEPTO, c.CIDALMASUM })
+                                .OrderByDescending(x => x.d.CIDDOCUMENTO)
+                                .Take(100)
+                                .ToListAsync(cancellationToken);
+
+        foreach (var item in rawResults)
+        {
+            item.d.CCODIGOCONCEPTO = item.ConceptoCodigo;
+            item.d.CIDALMACEN = item.CIDALMASUM;
+        }
+
+        return rawResults.Select(x => x.d);
     }
 }

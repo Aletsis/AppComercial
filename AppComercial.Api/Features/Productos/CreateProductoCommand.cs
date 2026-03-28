@@ -138,19 +138,19 @@ public class CreateProductoCommandHandler : IRequestHandler<CreateProductoComman
             // Valores requeridos por el SDK que se inicializan con defaults seguros
             cStatusProducto          = 1,   // 1 = Alta
             cMetodoCosteo            = 0,
-            cCodigoUnidadNoConvertible = string.Empty,
-            cNombreCaracteristica1   = string.Empty,
-            cNombreCaracteristica2   = string.Empty,
-            cNombreCaracteristica3   = string.Empty,
-            cCodigoValorClasificacion1 = request.Clasificacion1 ?? string.Empty,
-            cCodigoValorClasificacion2 = request.Clasificacion2 ?? string.Empty,
-            cCodigoValorClasificacion3 = string.Empty,
-            cCodigoValorClasificacion4 = string.Empty,
-            cCodigoValorClasificacion5 = request.Clasificacion5 ?? string.Empty,
-            cCodigoValorClasificacion6 = string.Empty,
-            cTextoExtra1             = string.Empty,
-            cTextoExtra2             = string.Empty,
-            cTextoExtra3             = string.Empty,
+            cCodigoUnidadNoConvertible = null,
+            cNombreCaracteristica1   = null,
+            cNombreCaracteristica2   = null,
+            cNombreCaracteristica3   = null,
+            cCodigoValorClasificacion1 = string.IsNullOrWhiteSpace(request.Clasificacion1) ? null : request.Clasificacion1,
+            cCodigoValorClasificacion2 = string.IsNullOrWhiteSpace(request.Clasificacion2) ? null : request.Clasificacion2,
+            cCodigoValorClasificacion3 = null,
+            cCodigoValorClasificacion4 = null,
+            cCodigoValorClasificacion5 = string.IsNullOrWhiteSpace(request.Clasificacion5) ? null : request.Clasificacion5,
+            cCodigoValorClasificacion6 = null,
+            cTextoExtra1             = null,
+            cTextoExtra2             = null,
+            cTextoExtra3             = null,
         };
 
         var nuevoId = await _sdk.CrearProductoAsync(nuevoProducto);

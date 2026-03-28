@@ -382,8 +382,5 @@ public class AdmClientes
     [Column("CWHATSAPP")]
     public string? CWHATSAPP { get; set; }
 
-    [Column("CCODIGOALTERNO")]
-    public string? CCODIGOALTERNO { get; set; }
-
 
 }
