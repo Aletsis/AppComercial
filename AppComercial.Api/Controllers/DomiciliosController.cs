@@ -1,5 +1,6 @@
-using AppComercial.Api.Features.Domicilios;
-using AppComercial.Api.Models;
+using AppComercial.Application.Features.Domicilios;
+using AppComercial.Domain.Entities;
+using AppComercial.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 

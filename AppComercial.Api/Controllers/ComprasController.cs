@@ -1,6 +1,8 @@
-using AppComercial.Api.Features.Compras;
-using AppComercial.Api.Models;
-using AppComercial.Api.Sdk;
+using AppComercial.Application.Features.Compras;
+using AppComercial.Domain.Entities;
+using AppComercial.Domain.Interfaces;
+using AppComercial.Domain.Interfaces;
+using AppComercial.Domain.Interfaces.SdkModels;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

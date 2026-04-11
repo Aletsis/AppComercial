@@ -75,3 +75,9 @@ launchSettings.json
 *.p12
 *.key
 *.pem
+
+## Otros
+Releases/
+*.xml
+
+

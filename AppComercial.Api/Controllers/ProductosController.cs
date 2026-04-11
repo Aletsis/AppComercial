@@ -1,5 +1,7 @@
-using AppComercial.Api.Features.Productos;
-using AppComercial.Api.Models;
+using AppComercial.Application.Features.Productos;
+using AppComercial.Application.DTOs;
+using AppComercial.Domain.Entities;
+using AppComercial.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,17 +19,29 @@ public class ProductosController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AdmProductos>>> Get([FromQuery] string? codigo, [FromQuery] int? tipo)
+    public async Task<ActionResult<PaginatedResult<ProductoDto>>> Get(
+        [FromQuery] string? search, 
+        [FromQuery] int? tipo,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] bool onlyActive = true)
     {
         try
         {
-            var query = new GetProductosQuery { Codigo = codigo, TipoProducto = tipo };
+            var query = new GetProductosQuery 
+            { 
+                SearchTerm = search, 
+                TipoProducto = tipo,
+                Page = page,
+                PageSize = pageSize,
+                OnlyActive = onlyActive
+            };
             var result = await _mediator.Send(query);
             return Ok(result);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error al obtener productos desde SQL Server: {ex.Message}");
+            return StatusCode(500, $"Error al obtener productos: {ex.Message}");
         }
     }
 

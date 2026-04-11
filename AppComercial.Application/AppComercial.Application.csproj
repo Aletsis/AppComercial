@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ 
+   <ItemGroup>
+     <ProjectReference Include="..\AppComercial.Domain\AppComercial.Domain.csproj" />
+   </ItemGroup>
+ 
+   <ItemGroup>
+     <PackageReference Include="AutoMapper" Version="16.1.1" />
+     <PackageReference Include="FluentValidation" Version="11.4.0" />
+     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.4.0" />
+     <PackageReference Include="MediatR" Version="14.1.0" />
+     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.5" />
+     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.5" />
+     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.17.0" />
+     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.17.0" />
+   </ItemGroup>
+ 
+   <PropertyGroup>
+     <TargetFramework>net10.0</TargetFramework>
+     <ImplicitUsings>enable</ImplicitUsings>
+     <Nullable>enable</Nullable>
+     <PlatformTarget>x86</PlatformTarget>
+   </PropertyGroup>
+ 
+ </Project>

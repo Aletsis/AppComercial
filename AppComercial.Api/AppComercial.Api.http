@@ -1,6 +1,97 @@
-@AppComercial.Api_HostAddress = http://localhost:5271
+@Host = http://localhost:5271
+@Token = MII...tu_jwt_token_aqui...
 
-GET {{AppComercial.Api_HostAddress}}/weatherforecast/
+### 1. Autenticación
+# Iniciar sesión y obtener JWT
+# @name login
+POST {{Host}}/api/auth/login
+Content-Type: application/json
+
+{
+    "username": "SUPERVISOR",
+    "password": ""
+}
+
+### 2. Productos
+# Obtener listado general paginado
+GET {{Host}}/api/productos?page=1&pageSize=20
 Accept: application/json
+Authorization: Bearer {{Token}}
 
-###
+### Obtener productos filtrando por nombre o código (búsqueda)
+GET {{Host}}/api/productos?search=laptop
+Accept: application/json
+Authorization: Bearer {{Token}}
+
+### POST: Crear un nuevo Producto (Escritura en SDK)
+POST {{Host}}/api/productos
+Content-Type: application/json
+Authorization: Bearer {{Token}}
+
+{
+  "codigo": "PRB-001",
+  "nombre": "Producto de Prueba API",
+  "descripcion": "Creado desde REST API HTTP",
+  "tipoProducto": 1,
+  "controlExistencia": 1,
+  "idUnidadBase": 1, 
+  "precio1": 250.00,
+  "impuesto1": 16.0
+}
+
+### PUT: Actualizar Producto (Escritura en SDK)
+PUT {{Host}}/api/productos/PRB-001
+Content-Type: application/json
+Authorization: Bearer {{Token}}
+
+{
+  "nombre": "Producto Actualizado API",
+  "precio1": 299.99
+}
+
+### 3. Clientes
+# Obtener listado de clientes
+GET {{Host}}/api/clientes?page=1&pageSize=20
+Accept: application/json
+Authorization: Bearer {{Token}}
+
+### POST: Crear un nuevo Cliente (Escritura en SDK)
+POST {{Host}}/api/clientes
+Content-Type: application/json
+Authorization: Bearer {{Token}}
+
+{
+  "codigo": "CTE-API",
+  "razonSocial": "CLIENTE DE PRUEBAS DEL SDK S.A. DE C.V.",
+  "rfc": "XAXX010101000"
+}
+
+### 4. Facturas
+# Obtener facturas recientes
+GET {{Host}}/api/facturas?page=1&take=10
+Accept: application/json
+Authorization: Bearer {{Token}}
+
+### POST: Crear una Factura de Venta con movimientos (Escritura en SDK)
+POST {{Host}}/api/facturas
+Content-Type: application/json
+Authorization: Bearer {{Token}}
+
+{
+  "codigoConcepto": "4",
+  "rfcCliente": "XAXX010101000",
+  "metodoPago": "PUE",
+  "formaPago": "01",
+  "usoCfdi": "G03",
+  "moneda": "Peso Mexicano",
+  "tipoCambio": 1.0,
+  "observaciones": "Creada vía REST API",
+  "movimientos": [
+    {
+      "codigoProducto": "PRB-001",
+      "cantidad": 1,
+      "precio": 250.00,
+      "tasaIva": 16.0
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using AppComercial.Api.Features.Auth;
+using AppComercial.Application.Features.Auth;
 
 namespace AppComercial.Api.Controllers;
 

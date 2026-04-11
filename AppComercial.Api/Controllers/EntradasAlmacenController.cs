@@ -1,5 +1,6 @@
-using AppComercial.Api.Features.EntradasAlmacen;
-using AppComercial.Api.Models;
+using AppComercial.Application.Features.EntradasAlmacen;
+using AppComercial.Domain.Entities;
+using AppComercial.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -73,7 +74,7 @@ public class EntradasAlmacenController : ControllerBase
     [HttpPut("{codigoConcepto}/{serie}/{folio}")]
     public async Task<ActionResult<int>> Put(
         string codigoConcepto, string serie, string folio,
-        [FromBody] Features.EntradasAlmacen.UpdateEntradaAlmacenCommand command)
+        [FromBody] AppComercial.Application.Features.EntradasAlmacen.UpdateEntradaAlmacenCommand command)
     {
         try
         {

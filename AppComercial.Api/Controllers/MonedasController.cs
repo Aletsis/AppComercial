@@ -1,5 +1,6 @@
-using AppComercial.Api.Features.Monedas;
-using AppComercial.Api.Models;
+using AppComercial.Application.Features.Monedas;
+using AppComercial.Domain.Entities;
+using AppComercial.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 

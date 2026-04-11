@@ -1,5 +1,6 @@
-using AppComercial.Api.Features.Documentos;
-using AppComercial.Api.Models;
+using AppComercial.Application.Features.Documentos;
+using AppComercial.Domain.Entities;
+using AppComercial.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 

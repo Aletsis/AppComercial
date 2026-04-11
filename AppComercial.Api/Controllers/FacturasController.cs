@@ -1,4 +1,4 @@
-using AppComercial.Api.Features.Facturas;
+using AppComercial.Application.Features.Facturas;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,7 +23,7 @@ public class FacturasController : ControllerBase
     /// Filtra automáticamente por Conceptos con CNATURALEZA = 1.
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Models.AdmDocumentos>>> Get(
+    public async Task<ActionResult<IEnumerable<AppComercial.Domain.Entities.AdmDocumentos>>> Get(
         [FromQuery] string? codigoConcepto,
         [FromQuery] string? serie,
         [FromQuery] int? clienteId,
@@ -51,10 +51,10 @@ public class FacturasController : ControllerBase
     }
 
     /// <summary>
-    /// Crea una Factura de Venta completa (cabecera + partidas) en un solo request.
+    /// Crea una Factura de Cliente CFDI 4.0 completa (cabecera + partidas + timbrado desatendido).
     /// </summary>
     [HttpPost]
-    public async Task<ActionResult<int>> Post([FromBody] CreateFacturaCommand command)
+    public async Task<ActionResult<CreateFacturaResult>> Post([FromBody] CreateFacturaCommand command)
     {
         try
         {
@@ -63,6 +63,23 @@ public class FacturasController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al crear la factura en el SDK: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Crea una Factura Global CFDI 4.0 para el Público en General.
+    /// Cada ticket enviado en el payload se registra como una partida independiente.
+    /// </summary>
+    [HttpPost("global")]
+    public async Task<ActionResult<CreateFacturaResult>> PostGlobal([FromBody] CreateFacturaGlobalCommand command)
+    {
+        try
+        {
+            return Ok(await _mediator.Send(command));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error al crear la factura global: {ex.Message}");
         }
     }
 
@@ -91,7 +108,7 @@ public class FacturasController : ControllerBase
     /// Emite/timbra una Factura como CFDI.
     /// </summary>
     [HttpPost("emitir")]
-    public async Task<ActionResult<int>> Emitir([FromBody] Features.Documentos.EmitirDocumentoCommand command)
+    public async Task<ActionResult<int>> Emitir([FromBody] AppComercial.Application.Features.Documentos.EmitirDocumentoCommand command)
     {
         try
         {
@@ -107,7 +124,7 @@ public class FacturasController : ControllerBase
     /// Cancela una Factura existente.
     /// </summary>
     [HttpPost("cancelar")]
-    public async Task<ActionResult<int>> Cancelar([FromBody] Features.Documentos.CancelarDocumentoCommand command)
+    public async Task<ActionResult<int>> Cancelar([FromBody] AppComercial.Application.Features.Documentos.CancelarDocumentoCommand command)
     {
         try
         {
@@ -123,7 +140,7 @@ public class FacturasController : ControllerBase
     /// Salda una Factura contra un documento de pago.
     /// </summary>
     [HttpPost("saldar")]
-    public async Task<ActionResult<int>> Saldar([FromBody] Features.Documentos.SaldarDocumentoCommand command)
+    public async Task<ActionResult<int>> Saldar([FromBody] AppComercial.Application.Features.Documentos.SaldarDocumentoCommand command)
     {
         try
         {

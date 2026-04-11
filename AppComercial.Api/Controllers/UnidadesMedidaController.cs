@@ -1,5 +1,6 @@
-using AppComercial.Api.Features.UnidadesMedida;
-using AppComercial.Api.Models;
+using AppComercial.Application.Features.UnidadesMedida;
+using AppComercial.Domain.Entities;
+using AppComercial.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 

@@ -1,4 +1,4 @@
-using AppComercial.Api.Features.Cotizaciones;
+using AppComercial.Application.Features.Cotizaciones;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,7 +24,7 @@ public class CotizacionesController : ControllerBase
     /// de otras naturaleza-1 (facturas, pedidos).
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Models.AdmDocumentos>>> Get(
+    public async Task<ActionResult<IEnumerable<AppComercial.Domain.Entities.AdmDocumentos>>> Get(
         [FromQuery] string? codigoConcepto,
         [FromQuery] string? serie,
         [FromQuery] int? clienteId,

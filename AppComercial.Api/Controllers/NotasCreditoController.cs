@@ -1,4 +1,4 @@
-using AppComercial.Api.Features.NotasCredito;
+using AppComercial.Application.Features.NotasCredito;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,7 +24,7 @@ public class NotasCreditoController : ControllerBase
     /// Filtra automáticamente por Conceptos con CNATURALEZA = 3.
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Models.AdmDocumentos>>> Get(
+    public async Task<ActionResult<IEnumerable<AppComercial.Domain.Entities.AdmDocumentos>>> Get(
         [FromQuery] string? codigoConcepto,
         [FromQuery] string? serie,
         [FromQuery] int? clienteId,
@@ -52,11 +52,10 @@ public class NotasCreditoController : ControllerBase
     }
 
     /// <summary>
-    /// Crea una Nota de Crédito completa (cabecera + partidas) en un solo request.
-    /// Los productos regresan al almacén especificado en cada partida.
+    /// Crea una Nota de Crédito CFDI 4.0 completa (cabecera + partidas + relación UUID + timbrado + saldado CXC).
     /// </summary>
     [HttpPost]
-    public async Task<ActionResult<int>> Post([FromBody] CreateNotaCreditoCommand command)
+    public async Task<ActionResult<CreateNotaCreditoResult>> Post([FromBody] CreateNotaCreditoCommand command)
     {
         try
         {
@@ -93,7 +92,7 @@ public class NotasCreditoController : ControllerBase
     /// Emite/timbra una Nota de Crédito como CFDI (cuando aplica).
     /// </summary>
     [HttpPost("emitir")]
-    public async Task<ActionResult<int>> Emitir([FromBody] Features.Documentos.EmitirDocumentoCommand command)
+    public async Task<ActionResult<int>> Emitir([FromBody] AppComercial.Application.Features.Documentos.EmitirDocumentoCommand command)
     {
         try
         {
@@ -109,7 +108,7 @@ public class NotasCreditoController : ControllerBase
     /// Cancela una Nota de Crédito existente.
     /// </summary>
     [HttpPost("cancelar")]
-    public async Task<ActionResult<int>> Cancelar([FromBody] Features.Documentos.CancelarDocumentoCommand command)
+    public async Task<ActionResult<int>> Cancelar([FromBody] AppComercial.Application.Features.Documentos.CancelarDocumentoCommand command)
     {
         try
         {

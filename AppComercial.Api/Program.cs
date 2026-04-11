@@ -1,7 +1,9 @@
 using AppComercial.Api.Gateway.Middleware;
-using AppComercial.Api.Infrastructure;
-using AppComercial.Api.Infrastructure.Repositories;
-using AppComercial.Api.Sdk;
+using AppComercial.Application;
+using AppComercial.Infrastructure;
+using AppComercial.Domain.Interfaces;
+using AppComercial.Domain.Interfaces;
+using AppComercial.Domain.Interfaces.SdkModels;
 using AspNetCoreRateLimit;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
@@ -11,179 +13,180 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using AppComercial.Application.Features.Productos;
+using AppComercial.Infrastructure.Repositories;
+using AppComercial.Infrastructure.Sdk;
+using AppComercial.Application.Common.Interfaces;
+using Microsoft.OpenApi.Models;
 
-var builder = WebApplication.CreateBuilder(args);
+// Punto de entrada si se ejecuta la API sola
+var app = ApiServer.CreateServer(args);
+app.Run();
 
-// Add services to the container.
-builder.Services.AddControllers();
-
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+public static class ApiServer
 {
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    public static WebApplication CreateServer(string[] args, Action<string>? logAction = null)
     {
-        Title = "CONTPAQi Comercial API Local (Open Source)",
-        Version = "v1",
-        Description = "API Web hibrida usando EF Core (Lectura rápida) y P/Invoke SDK (Escritura)."
-    });
-
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-    {
-        Name = "Authorization",
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
-        Scheme = "Bearer",
-        BearerFormat = "JWT",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "Ingrese 'Bearer' [espacio] y luego su token válido."
-    });
-
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
-    {
+        // Al correr como Servicio de Windows, el directorio de inicio suele ser C:\Windows\System32
+        // Forzamos explícitamente el origen de ejecución y de contenido:
+        var options = new WebApplicationOptions
         {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
-                {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
-});
-
-// Registrar DbContext de Entity Framework Core para Consultas Rápidas SQL.
-// Nota: Aquí pasamos el connection string de appsettings.json
-var msSqlConnectionString = builder.Configuration.GetConnectionString("ContpaqiComercial");
-builder.Services.AddDbContext<ContpaqiDbContext>(options =>
-{
-    if (string.IsNullOrEmpty(msSqlConnectionString))
-    {
-        // Fallback a SQL Express base predeterminada
-        options.UseSqlServer("Server=localhost\\Compac;Database=adCONTPAQi_Comercial;Trusted_Connection=True;Encrypt=False;",
-            options => options.UseCompatibilityLevel(120));
-    }
-    else 
-    {
-        options.UseSqlServer(msSqlConnectionString,
-            options => options.UseCompatibilityLevel(120));
-    }
-});
-
-// Registrar DbContext secundario para CompacWAdmin (usuarios activos del sistema CONTPAQi)
-var compacWAdminConnectionString = builder.Configuration.GetConnectionString("CompacWAdmin");
-builder.Services.AddDbContext<CompacWAdminDbContext>(options =>
-{
-    var connStr = string.IsNullOrEmpty(compacWAdminConnectionString)
-        ? "Server=localhost\\PCOMERCIAL;Database=CompacWAdmin;Trusted_Connection=True;Encrypt=False;"
-        : compacWAdminConnectionString;
-    options.UseSqlServer(connStr, options => options.UseCompatibilityLevel(120));
-});
-
-// Registrar DbContext para RepositorioAdminPAQ (usuarios y perfiles de CONTPAQi)
-var repositorioAdminConnectionString = builder.Configuration.GetConnectionString("RepositorioAdminPAQ");
-builder.Services.AddDbContext<RepositorioAdminDbContext>(options =>
-{
-    var connStr = string.IsNullOrEmpty(repositorioAdminConnectionString)
-        ? "Server=localhost\\PCOMERCIAL;Database=RepositorioAdminPAQ;Trusted_Connection=True;Encrypt=False;"
-        : repositorioAdminConnectionString;
-    options.UseSqlServer(connStr, options => options.UseCompatibilityLevel(120));
-});
-
-// Registrar MediatR para CQRS
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
-
-// Registrar AutoMapper
-builder.Services.AddAutoMapper(typeof(Program).Assembly);
-
-// Registrar FluentValidation
-builder.Services.AddValidatorsFromAssemblyContaining<Program>();
-
-// Registrar Rate Limiting
-builder.Services.AddMemoryCache();
-builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
-builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
-builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
-builder.Services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
-
-// Registrar CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", builder =>
-    {
-        builder.AllowAnyOrigin()
-               .AllowAnyMethod()
-               .AllowAnyHeader();
-    });
-});
-
-// Registrar API Versioning
-builder.Services.AddApiVersioning(options =>
-{
-    options.AssumeDefaultVersionWhenUnspecified = true;
-    options.DefaultApiVersion = new ApiVersion(1, 0);
-    options.ReportApiVersions = true;
-});
-
-builder.Services.AddVersionedApiExplorer(options =>
-{
-    options.GroupNameFormat = "'v'VVV";
-    options.SubstituteApiVersionInUrl = true;
-});
-
-// Registrar Repositories
-builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
-builder.Services.AddScoped<IClienteRepository, ClienteRepository>();
-
-// Registrar Wrapper SDK Open Source (P/Invoke) para Escrituras
-builder.Services.AddSingleton<IContpaqiSdk, ContpaqiSdk>();
-
-// Servicio Background para Inicializar la conexión COM con CONTPAQi Comercial
-// Descoméntalo si realmente necesitas el SDK activo (para que no choque si no está el Server de CONTPAQi configurado en dev local)
-builder.Services.AddHostedService<ContpaqiHostedService>();
-
-// Configurar Autenticación con JWT
-var secretKey = builder.Configuration["JwtSettings:SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey is not configured. Set it in appsettings.json or user secrets.");
-var key = Encoding.UTF8.GetBytes(secretKey);
-
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.RequireHttpsMetadata = false; // Solo true en producción/HTTPS
-        options.SaveToken = true;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key),
-            ValidateIssuer = false,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
+            Args = args,
+            ContentRootPath = AppContext.BaseDirectory
         };
-    });
+        var builder = WebApplication.CreateBuilder(options);
+        
+        builder.Host.UseWindowsService(options =>
+        {
+            options.ServiceName = "AppComercialApi";
+        });
 
-var app = builder.Build();
+        if (logAction != null)
+        {
+            builder.Logging.AddProvider(new ActionLoggerProvider(logAction));
+        }
 
-// Configure the HTTP request pipeline.
-app.UseGlobalExceptionHandler();
-app.UseRequestResponseLogging();
-app.UseIpRateLimiting();
-app.UseCors("AllowAll");
+        // Add services to the container.
+        builder.Services.AddControllers()
+               .AddApplicationPart(typeof(ApiServer).Assembly); // Forzar carga de controladores
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "CONTPAQi Comercial API Open Source V1");
-        c.RoutePrefix = string.Empty; // Para que Swagger este en la raiz
-    });
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen(c =>
+        {
+            c.SwaggerDoc("v1", new OpenApiInfo
+            {
+                Title = "CONTPAQi Comercial API Local (Open Source)",
+                Version = "v1",
+                Description = "API Web hibrida usando EF Core (Lectura rápida) y P/Invoke SDK (Escritura)."
+            });
+
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                Scheme = "Bearer",
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Description = "Ingrese 'Bearer' [espacio] y luego su token válido."
+            });
+
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                    },
+                    Array.Empty<string>()
+                }
+            });
+        });
+
+        builder.Services.AddApplicationServices();
+        builder.Services.AddInfrastructureServices(builder.Configuration);
+
+        builder.Services.AddMemoryCache();
+        builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+        builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
+        builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
+        builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+        builder.Services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
+
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("AllowAll", policy => { policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader(); });
+        });
+
+        builder.Services.AddApiVersioning(options =>
+        {
+            options.AssumeDefaultVersionWhenUnspecified = true;
+            options.DefaultApiVersion = new ApiVersion(1, 0);
+            options.ReportApiVersions = true;
+        });
+
+        builder.Services.AddVersionedApiExplorer(options =>
+        {
+            options.GroupNameFormat = "'v'VVV";
+            options.SubstituteApiVersionInUrl = true;
+        });
+
+        var secretKey = builder.Configuration["JwtSettings:SecretKey"] ?? "SUPER_CLAVE_SECRETA_LARGA_123456789";
+        var key = Encoding.UTF8.GetBytes(secretKey);
+
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.RequireHttpsMetadata = false;
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                };
+            });
+
+        var app = builder.Build();
+
+        app.UseGlobalExceptionHandler();
+        app.UseRequestResponseLogging();
+        app.UseIpRateLimiting();
+        app.UseCors("AllowAll");
+
+        if (app.Environment.IsDevelopment() || true) // Permitir Swagger siempre en app desktop
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "CONTPAQi Comercial API Open Source V1");
+                c.RoutePrefix = string.Empty;
+            });
+        }
+
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.MapControllers();
+
+        return app;
+    }
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
+public class ActionLoggerProvider : ILoggerProvider
+{
+    private readonly Action<string> _logAction;
+    public ActionLoggerProvider(Action<string> logAction) => _logAction = logAction;
+    public ILogger CreateLogger(string categoryName) => new ActionLogger(categoryName, _logAction);
+    public void Dispose() { }
+}
 
-app.MapControllers();
-
-app.Run();
+public class ActionLogger : ILogger
+{
+    private readonly string _categoryName;
+    private readonly Action<string> _logAction;
+    public ActionLogger(string categoryName, Action<string> logAction)
+    {
+        _categoryName = categoryName;
+        _logAction = logAction;
+    }
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    {
+        if (!IsEnabled(logLevel)) return;
+        var msg = formatter(state, exception);
+        if (exception != null) msg += $"\n{exception}";
+        // Limitar la verbosidad
+        if (_categoryName.StartsWith("Microsoft.AspNetCore") || _categoryName.StartsWith("Microsoft.EntityFrameworkCore.Database.Command")) 
+        {
+            if (logLevel >= LogLevel.Warning)
+                _logAction($"[{logLevel}] {_categoryName}: {msg}");
+        }
+        else
+        {
+            _logAction($"[{logLevel}] {msg}");
+        }
+    }
+}

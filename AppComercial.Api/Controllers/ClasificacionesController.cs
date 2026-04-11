@@ -1,4 +1,4 @@
-using AppComercial.Api.Features.Clasificaciones;
+using AppComercial.Application.Features.Clasificaciones;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 

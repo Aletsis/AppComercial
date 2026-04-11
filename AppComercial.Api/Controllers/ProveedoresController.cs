@@ -1,5 +1,7 @@
-using AppComercial.Api.Features.Clientes;
-using AppComercial.Api.Models;
+using AppComercial.Application.Features.Clientes;
+using AppComercial.Application.DTOs;
+using AppComercial.Domain.Entities;
+using AppComercial.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,13 +19,22 @@ public class ProveedoresController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AdmClientes>>> Get([FromQuery] string? codigo)
+    public async Task<ActionResult<PaginatedResult<ClienteDto>>> Get(
+        [FromQuery] string? searchTerm,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
     {
         try
         {
             // En CONTPAQi Comercial el TipoCliente = 3 significa estrictamente Proveedor
             // (1 = Cliente, 2 = Cliente/Proveedor, 3 = Proveedor)
-            var query = new GetClientesQuery { Codigo = codigo, TipoCliente = 3 };
+            var query = new GetClientesQuery 
+            { 
+                SearchTerm = searchTerm, 
+                TipoCliente = 3,
+                Page = page,
+                PageSize = pageSize
+            };
             var result = await _mediator.Send(query);
             return Ok(result);
         }
