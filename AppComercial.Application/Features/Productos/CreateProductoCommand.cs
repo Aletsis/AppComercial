@@ -71,6 +71,12 @@ public class CreateProductoCommand : IRequest<int>
     public double Precio1 { get; set; } = 0;
 
     /// <summary>
+    /// Precio de lista 2 (Mayoreo) del producto. Por defecto: 0.
+    /// </summary>
+    [Range(0, double.MaxValue, ErrorMessage = "El precio debe ser mayor o igual a 0.")]
+    public double Precio2 { get; set; } = 0;
+
+    /// <summary>
     /// Porcentaje de impuesto 1 (IVA) aplicado al producto. Por defecto: 0.
     /// Ejemplo: 16 (para 16% de IVA).
     /// </summary>
@@ -105,6 +111,12 @@ public class CreateProductoCommand : IRequest<int>
     /// Id de la unidad dentro del XML. Se asume que es el ID interno.
     /// </summary>
     public int? IdUnidadXml { get; set; }
+
+    /// <summary>
+    /// Código alterno del producto (Código de barras).
+    /// </summary>
+    [StringLength(30, ErrorMessage = "El código alterno no puede exceder 30 caracteres.")]
+    public string? CodigoAlterno { get; set; }
 }
 
 public class CreateProductoCommandHandler : IRequestHandler<CreateProductoCommand, int>
@@ -140,23 +152,24 @@ public class CreateProductoCommandHandler : IRequestHandler<CreateProductoComman
             cControlExistencia       = request.ControlExistencia,
             cCodigoUnidadBase        = unidad.NombreUnidad,
             cPrecio1                 = request.Precio1,
+            cPrecio2                 = request.Precio2,
             cImpuesto1               = request.Impuesto1,
             // Valores requeridos por el SDK que se inicializan con defaults seguros
             cStatusProducto          = 1,   // 1 = Alta
             cMetodoCosteo            = 0,
-            cCodigoUnidadNoConvertible = null,
-            cNombreCaracteristica1   = null,
-            cNombreCaracteristica2   = null,
-            cNombreCaracteristica3   = null,
-            cCodigoValorClasificacion1 = string.IsNullOrWhiteSpace(request.Clasificacion1) ? null : request.Clasificacion1,
-            cCodigoValorClasificacion2 = string.IsNullOrWhiteSpace(request.Clasificacion2) ? null : request.Clasificacion2,
-            cCodigoValorClasificacion3 = null,
-            cCodigoValorClasificacion4 = null,
-            cCodigoValorClasificacion5 = string.IsNullOrWhiteSpace(request.Clasificacion5) ? null : request.Clasificacion5,
-            cCodigoValorClasificacion6 = null,
-            cTextoExtra1             = null,
-            cTextoExtra2             = null,
-            cTextoExtra3             = null,
+            cCodigoUnidadNoConvertible = "",
+            cNombreCaracteristica1   = "",
+            cNombreCaracteristica2   = "",
+            cNombreCaracteristica3   = "",
+            cCodigoValorClasificacion1 = string.IsNullOrWhiteSpace(request.Clasificacion1) ? "" : request.Clasificacion1,
+            cCodigoValorClasificacion2 = string.IsNullOrWhiteSpace(request.Clasificacion2) ? "" : request.Clasificacion2,
+            cCodigoValorClasificacion3 = "",
+            cCodigoValorClasificacion4 = "",
+            cCodigoValorClasificacion5 = string.IsNullOrWhiteSpace(request.Clasificacion5) ? "" : request.Clasificacion5,
+            cCodigoValorClasificacion6 = "",
+            cTextoExtra1             = "",
+            cTextoExtra2             = "",
+            cTextoExtra3             = "",
         };
 
         var nuevoId = await _sdk.CrearProductoAsync(nuevoProducto);
@@ -167,6 +180,9 @@ public class CreateProductoCommandHandler : IRequestHandler<CreateProductoComman
 
         if (request.IdUnidadXml.HasValue)
             datosExtra["CIDUNIXML"] = request.IdUnidadXml.Value.ToString();
+
+        if (request.CodigoAlterno != null)
+            datosExtra["CCODALTERN"] = request.CodigoAlterno;
 
         if (datosExtra.Count > 0)
         {

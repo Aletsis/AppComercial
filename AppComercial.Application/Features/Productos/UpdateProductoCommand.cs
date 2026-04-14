@@ -52,6 +52,12 @@ public class UpdateProductoCommand : IRequest<int>
     /// </summary>
     [Range(0, double.MaxValue, ErrorMessage = "El precio debe ser mayor o igual a 0.")]
     public double? Precio1 { get; set; }
+    
+    /// <summary>
+    /// Nuevo precio de lista 2 (Mayoreo). Opcional. Debe ser mayor o igual a 0.
+    /// </summary>
+    [Range(0, double.MaxValue, ErrorMessage = "El precio debe ser mayor o igual a 0.")]
+    public double? Precio2 { get; set; }
 
     /// <summary>
     /// Nuevo porcentaje de impuesto 1 (IVA). Opcional. Entre 0 y 100.
@@ -110,6 +116,12 @@ public class UpdateProductoCommand : IRequest<int>
     /// Id de la unidad de medida base del producto. Opcional.
     /// </summary>
     public int? IdUnidadBase { get; set; }
+
+    /// <summary>
+    /// Código alterno del producto (Código de barras).
+    /// </summary>
+    [StringLength(30, ErrorMessage = "El código alterno no puede exceder 30 caracteres.")]
+    public string? CodigoAlterno { get; set; }
 }
 
 public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoCommand, int>
@@ -127,10 +139,10 @@ public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoComman
     {
         var datos = new Dictionary<string, string>();
 
-        if (!string.IsNullOrWhiteSpace(request.Nombre))
+        if (request.Nombre != null)
             datos["CNOMBREPRODUCTO"] = request.Nombre;
 
-        if (!string.IsNullOrWhiteSpace(request.Descripcion))
+        if (request.Descripcion != null)
             datos["CDESCRIPCIONPRODUCTO"] = request.Descripcion;
 
         if (request.TipoProducto.HasValue)
@@ -141,6 +153,9 @@ public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoComman
 
         if (request.Precio1.HasValue)
             datos["CPRECIO1"] = request.Precio1.Value.ToString("F6");
+
+        if (request.Precio2.HasValue)
+            datos["CPRECIO2"] = request.Precio2.Value.ToString("F6");
 
         if (request.Impuesto1.HasValue)
             datos["CIMPUESTO1"] = request.Impuesto1.Value.ToString("F6");
@@ -206,6 +221,9 @@ public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoComman
             if (unidad != null)
                 datos["CIDUNIDADBASE"] = unidad.Id.ToString();
         }
+
+        if (request.CodigoAlterno != null)
+            datos["CCODALTERN"] = request.CodigoAlterno;
 
         if (datos.Count == 0)
             throw new ArgumentException(

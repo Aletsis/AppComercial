@@ -20,6 +20,9 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.CodigoSat, opt => opt.MapFrom(src => src.CCLAVESAT))
             .ForMember(dest => dest.UnidadMedidaId, opt => opt.MapFrom(src => src.CIDUNIDADBASE))
             .ForMember(dest => dest.UnidadMedidaNombre, opt => opt.MapFrom(src => src.UnidadMedidaBase != null ? src.UnidadMedidaBase.NombreUnidad : string.Empty))
+            .ForMember(dest => dest.IdUnidadXml, opt => opt.MapFrom(src => src.CIDUNIXML))
+            .ForMember(dest => dest.CodigoAlterno, opt => opt.MapFrom(src => src.CCODALTERN))
+            .ForMember(dest => dest.TipoProducto, opt => opt.MapFrom(src => src.CTIPOPRODUCTO))
             .ForMember(dest => dest.Clasificacion1Id, opt => opt.MapFrom(src => src.CIDVALORCLASIFICACION1))
             .ForMember(dest => dest.Clasificacion5Id, opt => opt.MapFrom(src => src.CIDVALORCLASIFICACION5))
             .ForMember(dest => dest.Activo, opt => opt.MapFrom(src => src.CSTATUSPRODUCTO == 1));
@@ -30,6 +33,8 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.RazonSocial, opt => opt.MapFrom(src => src.CRAZONSOCIAL))
             .ForMember(dest => dest.RFC, opt => opt.MapFrom(src => src.CRFC))
             .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.CEMAIL1))
+            .ForMember(dest => dest.RegimenFiscal, opt => opt.MapFrom(src => src.CREGIMFISC))
+            .ForMember(dest => dest.UsoCFDI, opt => opt.MapFrom(src => src.CUSOCFDI))
             .ForMember(dest => dest.Activo, opt => opt.MapFrom(src => src.CESTATUS == 1));
 
         CreateMap<AdmAlmacenes, AlmacenDto>()

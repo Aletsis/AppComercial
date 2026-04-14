@@ -2,7 +2,6 @@ using AppComercial.Api.Gateway.Middleware;
 using AppComercial.Application;
 using AppComercial.Infrastructure;
 using AppComercial.Domain.Interfaces;
-using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using AspNetCoreRateLimit;
 using FluentValidation;
@@ -18,11 +17,23 @@ using AppComercial.Infrastructure.Repositories;
 using AppComercial.Infrastructure.Sdk;
 using AppComercial.Application.Common.Interfaces;
 using Microsoft.OpenApi.Models;
+using System.Runtime.Versioning;
+
+[assembly: SupportedOSPlatform("windows")]
 
 // Punto de entrada si se ejecuta la API sola
-var app = ApiServer.CreateServer(args);
+var logDir = @"C:\AppComercialLogs";
+if (!Directory.Exists(logDir)) try { Directory.CreateDirectory(logDir); } catch { }
+var logPath = Path.Combine(logDir, "ApiServer.log");
+
+var app = ApiServer.CreateServer(args, msg => {
+    var fullMsg = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {msg}\n";
+    try { File.AppendAllText(logPath, fullMsg); } catch { }
+    Console.Write(fullMsg);
+});
 app.Run();
 
+[SupportedOSPlatform("windows")]
 public static class ApiServer
 {
     public static WebApplication CreateServer(string[] args, Action<string>? logAction = null)
@@ -36,10 +47,13 @@ public static class ApiServer
         };
         var builder = WebApplication.CreateBuilder(options);
         
-        builder.Host.UseWindowsService(options =>
-        {
-            options.ServiceName = "AppComercialApi";
-        });
+        // Configurar la URL de escucha desde appsettings.json (permitiendo acceso externo si se usa http://*:5271)
+        var listenUrl = builder.Configuration["ApiSettings:ListenUrl"] ?? "http://*:5271";
+        builder.WebHost.UseUrls(listenUrl);
+
+        // La API ya no corre como Servicio de Windows para evitar conflictos (Session 0 isolation)
+        // con los componentes COM nativos del SDK de CONTPAQi.
+        // Ahora es administrada puramente por el ServerManager en la sesión activa del usuario.
 
         if (logAction != null)
         {

@@ -6,9 +6,11 @@ using Microsoft.Win32;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.Versioning;
 
 namespace AppComercial.Infrastructure.Sdk;
 
+[SupportedOSPlatform("windows")]
 public class ContpaqiSdk : IContpaqiSdk
 {
     // Semaphore to enforce single-threaded access to the native COM SDK
@@ -70,19 +72,41 @@ public class ContpaqiSdk : IContpaqiSdk
     {
         string? directorioBase = null;
 
-        try
+        // CONTPAQi registra su DirectorioBase bajo distintos nombres según la versión.
+        // Intentar todas las variantes conocidas antes de usar el fallback.
+        var candidatosRegistro = sistema == SistemaContpaqi.FacturaElectronica
+            ? new[]
+            {
+                @"SOFTWARE\Computación en Acción, SA CV\CONTPAQ I FACTURACION",
+                @"SOFTWARE\Computacion en Accion, SA CV\CONTPAQ I FACTURACION",
+                @"SOFTWARE\CONTPAQ i®\CONTPAQ I FACTURACION",
+                @"SOFTWARE\CONTPAQ i(R)\CONTPAQ I FACTURACION",
+            }
+            : new[]
+            {
+                @"SOFTWARE\Computación en Acción, SA CV\CONTPAQ I COMERCIAL",
+                @"SOFTWARE\Computacion en Accion, SA CV\CONTPAQ I COMERCIAL",
+                @"SOFTWARE\CONTPAQ i®\CONTPAQ I COMERCIAL",
+                @"SOFTWARE\CONTPAQ i(R)\CONTPAQ I COMERCIAL",
+                @"SOFTWARE\Computación en Acción, SA CV\CONTPAQ i® Comercial",
+                @"SOFTWARE\Computacion en Accion, SA CV\CONTPAQ i Comercial",
+            };
+
+        foreach (var subKey in candidatosRegistro)
         {
-            // Cada sistema tiene su propia clave en el Registro de Windows (32-bit hive)
-            var registrySubKey = sistema == SistemaContpaqi.FacturaElectronica
-                ? @"SOFTWARE\Computación en Acción, SA CV\CONTPAQ I FACTURACION"
-                : @"SOFTWARE\Computación en Acción, SA CV\CONTPAQ I COMERCIAL";
-
-            using var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32)
-                .OpenSubKey(registrySubKey, false);
-
-            directorioBase = key?.GetValue("DirectorioBase")?.ToString();
+            try
+            {
+                using var key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32)
+                    .OpenSubKey(subKey, false);
+                var val = key?.GetValue("DirectorioBase")?.ToString();
+                if (!string.IsNullOrEmpty(val))
+                {
+                    directorioBase = val;
+                    break;
+                }
+            }
+            catch { /* continuar con la siguiente variante */ }
         }
-        catch { /* ignorar: usaremos el fallback */ }
 
         if (string.IsNullOrEmpty(directorioBase))
         {
@@ -386,7 +410,7 @@ public class ContpaqiSdk : IContpaqiSdk
             string sFolio = folio.ToString("0");
 
             // Look for files ending with [Folio].pdf that contain nuestra Serie o Concepto
-            string rutaArchivo = Directory.GetFiles(dirArchivoDigital, $"*{sFolio}.pdf")
+            string? rutaArchivo = Directory.GetFiles(dirArchivoDigital, $"*{sFolio}.pdf")
                 .Where(f => {
                     var name = Path.GetFileName(f);
                     bool matchConcepto = !string.IsNullOrEmpty(sConcepto) && name.StartsWith(sConcepto);
@@ -439,7 +463,7 @@ public class ContpaqiSdk : IContpaqiSdk
         try
         {
             string originalProductCode = movimiento.aCodProdSer;
-            string idProductoStr = null;
+            string? idProductoStr = null;
 
             // 1. OBTENER ID PRODUCTO PRIMERO
             // Hacemos esto antes de manipular el Documento para no romper el apuntador interno (causa de 0xC0000005)
@@ -831,8 +855,8 @@ public class ContpaqiSdk : IContpaqiSdk
         await _sdkSemaphore.WaitAsync();
         try
         {
-            string idProductoStr = null;
-            if (datos.TryGetValue("PRODUCTO", out string originalProductCode))
+            string? idProductoStr = null;
+            if (datos.TryGetValue("PRODUCTO", out string? originalProductCode))
             {
                 // Buscar el ID exacto antes de enfocar documento para evitar 0xC0000005
                 if (fBuscaProducto(originalProductCode) == 0)
