@@ -1,7 +1,6 @@
 using AppComercial.Application.Features.Compras;
 using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
-using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -37,6 +36,7 @@ public class ComprasController : ControllerBase
     public async Task<ActionResult<IEnumerable<AdmDocumentos>>> Get(
         [FromQuery] string? codigoConcepto,
         [FromQuery] string? serie,
+        [FromQuery] double? folio,
         [FromQuery] int? proveedorId,
         [FromQuery] DateTime? fechaDesde,
         [FromQuery] DateTime? fechaHasta)
@@ -47,6 +47,7 @@ public class ComprasController : ControllerBase
             {
                 CodigoConcepto = codigoConcepto,
                 Serie          = serie,
+                Folio          = folio,
                 ProveedorId    = proveedorId,
                 FechaDesde     = fechaDesde,
                 FechaHasta     = fechaHasta

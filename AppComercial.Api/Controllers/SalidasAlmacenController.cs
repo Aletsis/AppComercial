@@ -1,7 +1,6 @@
 using AppComercial.Application.Features.SalidasAlmacen;
 using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
-using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -64,7 +63,7 @@ public class SalidasAlmacenController : ControllerBase
     /// Crea una Salida de Almacén completa (cabecera + partidas) en un solo request.
     /// </summary>
     [HttpPost]
-    public async Task<ActionResult<int>> Post([FromBody] CreateSalidaAlmacenCommand command)
+    public async Task<ActionResult<CreateSalidaAlmacenResult>> Post([FromBody] CreateSalidaAlmacenCommand command)
     {
         try
         {

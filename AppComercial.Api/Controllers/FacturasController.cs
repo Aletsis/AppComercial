@@ -51,10 +51,11 @@ public class FacturasController : ControllerBase
     }
 
     /// <summary>
-    /// Crea una Factura de Cliente CFDI 4.0 completa (cabecera + partidas + timbrado desatendido).
+    /// Crea una Factura de Cliente (cabecera + partidas). 
+    /// Puede timbrar automáticamente si command.AutoTimbrar = true.
     /// </summary>
-    [HttpPost]
-    public async Task<ActionResult<CreateFacturaResult>> Post([FromBody] CreateFacturaCommand command)
+    [HttpPost("generar")]
+    public async Task<ActionResult<CreateFacturaResult>> Generar([FromBody] CreateFacturaCommand command)
     {
         try
         {
@@ -62,13 +63,19 @@ public class FacturasController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error al crear la factura en el SDK: {ex.Message}");
+            // TODO: Inyectar ILogger para registro estructurado
+            return StatusCode(500, $"Error al generar la factura en el SDK: {ex.Message}");
         }
     }
 
     /// <summary>
+    /// Crea una Factura CFDI completa (legacy endpoint).
+    /// </summary>
+    [HttpPost]
+    public async Task<ActionResult<CreateFacturaResult>> Post([FromBody] CreateFacturaCommand command) => await Generar(command);
+
+    /// <summary>
     /// Crea una Factura Global CFDI 4.0 para el Público en General.
-    /// Cada ticket enviado en el payload se registra como una partida independiente.
     /// </summary>
     [HttpPost("global")]
     public async Task<ActionResult<CreateFacturaResult>> PostGlobal([FromBody] CreateFacturaGlobalCommand command)
@@ -105,10 +112,10 @@ public class FacturasController : ControllerBase
     }
 
     /// <summary>
-    /// Emite/timbra una Factura como CFDI.
+    /// Timbra una Factura existente como CFDI. Devuelve datos fiscales detallados (UUID, Sellos, etc.).
     /// </summary>
-    [HttpPost("emitir")]
-    public async Task<ActionResult<int>> Emitir([FromBody] AppComercial.Application.Features.Documentos.EmitirDocumentoCommand command)
+    [HttpPost("timbrar")]
+    public async Task<ActionResult<AppComercial.Application.DTOs.TimbradoResult>> Timbrar([FromBody] AppComercial.Application.Features.Documentos.EmitirDocumentoCommand command)
     {
         try
         {
@@ -119,6 +126,12 @@ public class FacturasController : ControllerBase
             return StatusCode(500, $"Error al timbrar la factura: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Emite/timbra una Factura (legacy endpoint).
+    /// </summary>
+    [HttpPost("emitir")]
+    public async Task<ActionResult<AppComercial.Application.DTOs.TimbradoResult>> Emitir([FromBody] AppComercial.Application.Features.Documentos.EmitirDocumentoCommand command) => await Timbrar(command);
 
     /// <summary>
     /// Cancela una Factura existente.

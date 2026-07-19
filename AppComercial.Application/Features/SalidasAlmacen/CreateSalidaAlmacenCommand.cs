@@ -9,7 +9,7 @@ namespace AppComercial.Application.Features.SalidasAlmacen;
 /// Crea un documento de Salida de Almacén completo (cabecera + partidas) en CONTPAQi Comercial.
 /// El código de concepto debe ser uno configurado con naturaleza Salida de Almacén (CNATURALEZA = 5).
 /// </summary>
-public class CreateSalidaAlmacenCommand : IRequest<int>
+public class CreateSalidaAlmacenCommand : IRequest<CreateSalidaAlmacenResult>
 {
     /// <summary>
     /// Código del Concepto de tipo Salida de Almacén configurado en CONTPAQi. Requerido.
@@ -73,7 +73,15 @@ public class SalidaPartida
     public double Unidades { get; set; }
 }
 
-public class CreateSalidaAlmacenCommandHandler : IRequestHandler<CreateSalidaAlmacenCommand, int>
+public class CreateSalidaAlmacenResult
+{
+    public int IdDocumento { get; set; }
+    public string CodigoConcepto { get; set; } = string.Empty;
+    public string Serie { get; set; } = string.Empty;
+    public string Folio { get; set; } = string.Empty;
+}
+
+public class CreateSalidaAlmacenCommandHandler : IRequestHandler<CreateSalidaAlmacenCommand, CreateSalidaAlmacenResult>
 {
     private readonly IContpaqiSdk _sdk;
 
@@ -82,7 +90,7 @@ public class CreateSalidaAlmacenCommandHandler : IRequestHandler<CreateSalidaAlm
         _sdk = sdk;
     }
 
-    public async Task<int> Handle(CreateSalidaAlmacenCommand request, CancellationToken cancellationToken)
+    public async Task<CreateSalidaAlmacenResult> Handle(CreateSalidaAlmacenCommand request, CancellationToken cancellationToken)
     {
         // 1. Crear la cabecera del documento de salida
         var documento = new tDocumento
@@ -125,6 +133,40 @@ public class CreateSalidaAlmacenCommandHandler : IRequestHandler<CreateSalidaAlm
             await _sdk.CrearMovimientoAsync(idDocumento, movimiento);
         }
 
-        return idDocumento;
+        // 3. Leer Folio y Serie reales asignados por el SDK (con Reintento y Fallback)
+        string folioReal = "0";
+        string serieReal = request.Serie;
+        try 
+        { 
+            folioReal = await _sdk.LeerDatoDocumentoAsync("CFOLIO"); 
+        } 
+        catch 
+        { 
+            try { folioReal = await _sdk.LeerDatoDocumentoAsync("cFolio"); } catch { folioReal = idDocumento.ToString(); }
+        }
+
+        try 
+        { 
+            serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIEDOCUMENTO"); 
+        } 
+        catch 
+        { 
+            try 
+            { 
+                serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIE"); 
+            } 
+            catch 
+            { 
+                try { serieReal = await _sdk.LeerDatoDocumentoAsync("cSerie"); } catch { /* mantener serie del request */ }
+            }
+        }
+
+        return new CreateSalidaAlmacenResult
+        {
+            IdDocumento = idDocumento,
+            CodigoConcepto = request.CodigoConcepto,
+            Serie = serieReal?.Trim() ?? string.Empty,
+            Folio = folioReal?.Trim() ?? string.Empty
+        };
     }
 }

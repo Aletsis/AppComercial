@@ -18,6 +18,7 @@ public class ProductoDto
     public int IdUnidadXml { get; set; }
     public string? CodigoAlterno { get; set; }
     public int TipoProducto { get; set; }
+    public int ControlExistencia { get; set; }
     public int Clasificacion1Id { get; set; }
     public int Clasificacion5Id { get; set; }
     public bool Activo { get; set; }

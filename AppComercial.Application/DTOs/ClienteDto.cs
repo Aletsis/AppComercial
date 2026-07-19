@@ -7,5 +7,7 @@ public class ClienteDto
     public string RazonSocial { get; set; } = string.Empty;
     public string? RFC { get; set; }
     public string? Email { get; set; }
+    public string? RegimenFiscal { get; set; }
+    public string? UsoCFDI { get; set; }
     public bool Activo { get; set; }
 }

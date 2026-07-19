@@ -61,7 +61,7 @@ public class ProductoRepository : IProductoRepository
     public async Task<IEnumerable<AdmProductos>> GetByNombreAsync(string nombre)
     {
         return await _context.Productos.AsNoTracking()
-            .Where(p => p.CNOMBREPRODUCTO.Contains(nombre))
+            .Where(p => (p.CNOMBREPRODUCTO != null && p.CNOMBREPRODUCTO.Contains(nombre)) || (p.CCODIGOPRODUCTO != null && p.CCODIGOPRODUCTO == nombre))
             .ToListAsync();
     }
 }

@@ -43,7 +43,7 @@ public class GetClientesQueryHandler : IRequestHandler<GetClientesQuery, Paginat
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
         {
-            query = query.Where(c => c.CCODIGOCLIENTE.Contains(request.SearchTerm) || c.CRAZONSOCIAL.Contains(request.SearchTerm));
+            query = query.Where(c => (c.CCODIGOCLIENTE != null && c.CCODIGOCLIENTE.Contains(request.SearchTerm)) || (c.CRAZONSOCIAL != null && c.CRAZONSOCIAL.Contains(request.SearchTerm)));
         }
 
         if (request.TipoCliente.HasValue)

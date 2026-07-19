@@ -211,17 +211,4 @@ public class AdmMovimientos
     [Column("COBJIMPU01")]
     public string? COBJIMPU01 { get; set; }
 
-    [Column("CCONFIMP1")]
-    public int CCONFIMP1 { get; set; }
-
-    [Column("CCONFIMP2")]
-    public int CCONFIMP2 { get; set; }
-
-    [Column("CCONFIMP3")]
-    public int CCONFIMP3 { get; set; }
-
-    [Column("CCONFIMP4")]
-    public int CCONFIMP4 { get; set; }
-
-
 }

@@ -45,6 +45,22 @@ public class ProductosController : ControllerBase
         }
     }
 
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<ProductoDto>> GetById(int id)
+    {
+        try
+        {
+            var query = new GetProductoByIdQuery(id);
+            var result = await _mediator.Send(query);
+            if (result == null) return NotFound($"No se encontró el producto con ID {id}.");
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error al obtener producto por ID: {ex.Message}");
+        }
+    }
+
     [HttpPost]
     public async Task<ActionResult<int>> Post([FromBody] CreateProductoCommand command)
     {

@@ -1,0 +1,1559 @@
+Option Explicit
+Const kColIVAIncluido = 1
+Const kRenIVAIncluido = 5
+
+Const kRenInfoEmpresa = 4
+Const kRenInfoEmpresa2 = 7
+Const kColInfoEmpresa = 4
+
+Const kRenTitulos = 21
+Const kRenTickets = 22
+
+Const kColTicket = 2
+Const kColIvaGeneral = 4
+Const kColIvaTasa0 = 6
+Const kColIvaExento = 8
+Const kColImpuestoLocal = 10
+Const kColTasaCuotaIEPS1 = 11
+Const kColBaseIEPS1 = 12
+Const kColTasaCuotaSegundoIEPS1 = 17
+Const kColBaseSegundoIEPS1 = 18
+Const kColTotal = 23
+Const kColImporteLocal = 25
+Const kColImporteIEPS = 26
+Const kColImporteSegundoIEPS = 27
+
+Const kMaximasTasasCuotasIEPS = 3
+
+Dim gTasaIVA As Double
+Dim gTasaImpRetLocal As Double
+Dim gTasaIEPS As Double
+Dim gTasaSegundoIEPS As Double
+Dim gIncluirTasasIVA As Long
+
+Private Sub FbtnConcepto_Click()
+'Dim Nombre As String * 255
+Dim Nombre As String
+Dim Estatus As Long
+Dim EsCFD As Long
+Dim VersionCFD As Long
+Dim lFormulaImpRetLocal As Long
+Dim lUsaImpuesto As Long
+Dim Esquema As String * 26
+Dim lImpuesto As String * 10
+Dim lNumImpuesto As Long
+Dim lCampoCalculoImpRetLocal As String * 10
+Dim lCampoImpRetLocal As String * 10
+Dim lResultado  As Long
+
+    Range("CodigoConcepto").Select
+    Range("CodigoConcepto").Value = Consultas(1)
+    Range("NombreConcepto").Value = ""
+    'If dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value) = 0 Then
+    Call comFacturaMain.dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value, lResultado)
+    If lResultado = 0 Then
+        'dbFieldNameChar hDbc, CONCEPTOS, "cNombreC01", Nombre, 255
+        Call comFacturaMain.dbFieldNameChar(hDbc, CONCEPTOS, "cNombreC01", Nombre, 255, lResultado)
+        Range("NombreConcepto").Value = Trim(fEliminaEspaciosNulos2(Nombre))
+        'dbFieldNameLong hDbc, CONCEPTOS, "cEstatus", Estatus
+        Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cEstatus", Estatus, lResultado)
+        If Estatus = 0 Then
+            MsgBox "El concepto está inactivo", vbOKOnly
+            Range("CodigoConcepto").Value = ""
+            Range("FReferencia").Value = ""
+        Else
+            'dbFieldNameLong hDbc, CONCEPTOS, "cEsCFD", EsCFD
+            'dbFieldNameLong hDbc, CONCEPTOS, "cVerFacEle", VersionCFD
+            'dbFieldNameChar hDbc, CONCEPTOS, "cVerEsque", Esquema, 26
+            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cEsCFD", EsCFD, lResultado)
+            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cVerFacEle", VersionCFD, lResultado)
+            Call comFacturaMain.dbFieldNameChar(hDbc, CONCEPTOS, "cVerEsque", Esquema, 26, lResultado)
+            If EsCFD = 1 And VersionCFD = 2 And CDbl(Trim(fEliminaEspaciosNulos2(Esquema))) >= 3.3 Then
+            Else
+                MsgBox "El concepto debe de ser un CFDI versión 3.3", vbOKOnly
+                Range("CodigoConcepto").Value = ""
+                Range("FReferencia").Value = ""
+            End If
+            
+            'Verificar si el concepto tiene habilitado el IEPS
+            If gNumeroImpuestoIEPS <> 0 Then
+                lImpuesto = "cUsaImpu0" + CStr(gNumeroImpuestoIEPS) + ""
+                'dbFieldNameLong hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto
+                Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto, lResultado)
+                If (lUsaImpuesto = 1 And Worksheets("Parámetros").Range("HabilitarIEPS").Value = "Habilitar") Or (lUsaImpuesto <> 1 And Worksheets("Parámetros").Range("HabilitarIEPS").Value = "Sin uso") Then
+                    MsgBox "El impuesto IEPS debe estar habilitado tanto en el concepto como en la hoja electrónica.", vbOKOnly
+                    Range("CodigoConcepto").Value = ""
+                    Range("FReferencia").Value = ""
+                    Exit Sub
+                End If
+            End If
+            
+            If gNumeroSegundoImpuestoIEPS <> 0 Then
+                lImpuesto = "cUsaImpu0" + CStr(gNumeroSegundoImpuestoIEPS) + ""
+                'dbFieldNameLong hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto
+                Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto, lResultado)
+                If (lUsaImpuesto = 1 And Worksheets("Parámetros").Range("HabilitarIEPS").Value = "Habilitar") Or (lUsaImpuesto <> 1 And Worksheets("Parámetros").Range("HabilitarIEPS").Value = "Sin uso") Then
+                    MsgBox "El impuesto IEPS debe estar habilitado tanto en el concepto como en la hoja electrónica.", vbOKOnly
+                    Range("CodigoConcepto").Value = ""
+                    Range("FReferencia").Value = ""
+                    Exit Sub
+                End If
+            End If
+            
+            'Se utiliza la misma validación del cálculo del impuesto local que en la primera implementación de dicho impuesto en la HE
+            If gNumeroImpRetLocal <> 0 Then
+                lImpuesto = "cUsaImpu0" + CStr(gNumeroImpRetLocal) + ""
+                'dbFieldNameLong hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto
+                Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto, lResultado)
+                lCampoImpRetLocal = "cCfdImpu0" & gNumeroImpRetLocal
+                'dbGetTopNoLock hDbc, PARAMETROS, IxPARAMETROS
+                'dbFieldNameLong hDbc, PARAMETROS, lCampoImpRetLocal, lNumImpuesto
+                Call comFacturaMain.dbGetTopNoLock(hDbc, PARAMETROS, IxPARAMETROS, lResultado)
+                Call comFacturaMain.dbFieldNameLong(hDbc, PARAMETROS, lCampoImpRetLocal, lNumImpuesto, lResultado)
+                If lNumImpuesto = 5 Then
+                    If (lUsaImpuesto = 1 And Worksheets("Parámetros").Range("HabilitarImpRetLocal").Value = "Habilitar") Or (lUsaImpuesto <> 1 And Worksheets("Parámetros").Range("HabilitarImpRetLocal").Value = "Sin uso") Then
+                        MsgBox "La retención local debe estar habilitado tanto en el concepto como en la hoja electrónica.", vbOKOnly
+                        Range("CodigoConcepto").Value = ""
+                        Range("FReferencia").Value = ""
+                        Exit Sub
+                    Else
+                        If Worksheets("Parámetros").Range("TasaImpRetLocal").Value <> "" Then
+                            lCampoCalculoImpRetLocal = "cIdFormu07"
+                            'dbFieldNameLong hDbc, CONCEPTOS, lCampoCalculoImpRetLocal, lFormulaImpRetLocal
+                            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lCampoCalculoImpRetLocal, lFormulaImpRetLocal, lResultado)
+                            If lFormulaImpRetLocal <> 263 Then
+                                MsgBox "El concepto debe tener configurado el cálculo de la retención local como Retención(Neto - Descuentos).", vbOKOnly
+                                Range("CodigoConcepto").Value = ""
+                                Range("FReferencia").Value = ""
+                                Exit Sub
+                            End If
+                        End If
+                    End If
+                Else
+                    If (lUsaImpuesto = 1 And Worksheets("Parámetros").Range("HabilitarImpRetLocal").Value = "Habilitar") Or (lUsaImpuesto <> 1 And Worksheets("Parámetros").Range("HabilitarImpRetLocal").Value = "Sin uso") Then
+                        MsgBox "El impuesto local debe estar habilitado tanto en el concepto como en la hoja electrónica.", vbOKOnly
+                        Range("CodigoConcepto").Value = ""
+                        Range("FReferencia").Value = ""
+                        Exit Sub
+                    Else
+                        If Worksheets("Parámetros").Range("TasaImpRetLocal").Value <> "" Then
+                            lCampoCalculoImpRetLocal = "cIdFormu07"
+                            'dbFieldNameLong hDbc, CONCEPTOS, lCampoCalculoImpRetLocal, lFormulaImpRetLocal
+                            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lCampoCalculoImpRetLocal, lFormulaImpRetLocal, lResultado)
+                            If lFormulaImpRetLocal <> 61 Then
+                                MsgBox "El concepto debe tener configurado el cálculo del impuesto local como Neto - Descuentos.", vbOKOnly
+                                Range("CodigoConcepto").Value = ""
+                                Range("FReferencia").Value = ""
+                                Exit Sub
+                            End If
+                        End If
+                    End If
+                End If
+            End If
+        End If
+    End If
+    
+End Sub
+Private Sub FbtnCliente_Click()
+'Dim Nombre As String * 255
+Dim Nombre As String
+Dim lResultado As Long
+    
+    Range("CodigoCliente").Select
+    Range("CodigoCliente").Value = Consultas(2)
+    Range("NombreCliente").Value = ""
+    'If dbGetNoLock(hDbc, CLIENTES, IxICODIGOT01, Range("CodigoCliente").Value) = 0 Then
+    Call comFacturaMain.dbGetNoLock(hDbc, CLIENTES, IxICODIGOT01, Range("CodigoCliente").Value, lResultado)
+    If lResultado = 0 Then
+        'dbFieldNameChar hDbc, CLIENTES, "cRazonSo01", Nombre, 255
+        Call comFacturaMain.dbFieldNameChar(hDbc, CLIENTES, "cRazonSo01", Nombre, 255, lResultado)
+        Range("NombreCliente").Value = Trim(fEliminaEspaciosNulos2(Nombre))
+    End If
+End Sub
+Private Sub FbtnServicio_Click()
+'Dim Nombre As String * 255
+Dim Nombre As String
+Dim Clave As String * 26
+Dim lResultado As Long
+    
+    Range("CodigoServicio").Select
+    Range("CodigoServicio").Value = Consultas(3)
+    Range("NombreServicio").Value = ""
+    'If dbGetNoLock(hDbc, PRODUCTOS, IxICODIGOT01, Range("CodigoServicio").Value) = 0 Then
+    Call comFacturaMain.dbGetNoLock(hDbc, PRODUCTOS, IxICODIGOT01, Range("CodigoServicio").Value, lResultado)
+    If lResultado = 0 Then
+        'dbFieldNameChar hDbc, PRODUCTOS, "cNombreP01", Nombre, 255
+        Call comFacturaMain.dbFieldNameChar(hDbc, PRODUCTOS, "cNombreP01", Nombre, 255, lResultado)
+        Range("NombreServicio").Value = Trim(fEliminaEspaciosNulos2(Nombre))
+        'dbFieldNameChar hDbc, PRODUCTOS, "cClaveSAT", Clave, 26
+        Call comFacturaMain.dbFieldNameChar(hDbc, PRODUCTOS, "cClaveSAT", Clave, 26, lResultado)
+        If Trim(fEliminaEspaciosNulos2(Clave)) = "01010101" Then
+        Else
+            MsgBox "El servicio debe de tener la clave SAT: 01010101", vbOKOnly
+            Range("CodigoServicio").Value = ""
+        End If
+        'Clave = Space(26)
+        'dbFieldNameChar hDbc, PRODUCTOS, "cIdUniXML", Clave, 26
+        Call comFacturaMain.dbFieldNameChar(hDbc, PRODUCTOS, "cIdUniXML", Clave, 26, lResultado)
+        'If dbGetNoLock(hDbc, "MGW10026", "PrimaryKey", Trim(fEliminaEspaciosNulos2(Clave))) = 0 Then
+        Call comFacturaMain.dbGetNoLock(hDbc, "MGW10026", "PrimaryKey", Trim(fEliminaEspaciosNulos2(Clave)), lResultado)
+        If lResultado = 0 Then
+            'Clave = Space(26)
+            'dbFieldNameChar hDbc, "MGW10026", "cClaveInt", Clave, 26
+            Call comFacturaMain.dbFieldNameChar(hDbc, "MGW10026", "cClaveInt", Clave, 26, lResultado)
+        End If
+        If Trim(fEliminaEspaciosNulos2(Clave)) = "ACT" Then
+        Else
+            MsgBox "La unidad del servicio debe de tener la clave SAT: ACT", vbOKOnly
+            Range("CodigoServicio").Value = ""
+        End If
+    End If
+End Sub
+Private Sub FbtnFormaPago_Click()
+Dim lColumna1 As String
+Dim lBuffer As String
+Dim lResultado As Long
+
+    Application.EnableCancelKey = xlDisabled
+
+    Range("FormaDePago").Select
+    
+    lBuffer = Space(256)
+    lColumna1 = "<INI>,Anexo3.3.ini,FormaPago,SeccionValores,25,,0," & Chr(0)
+    'rDlgSeleccion 1, lBuffer, lColumna1
+    Call comFacturaMain.DlgSeleccion(1, lBuffer, lColumna1, lResultado)
+    'If Mid(lBuffer, 1, 1) <> Chr(0) Then
+    If lBuffer <> "" Then
+        Range("FormaDePago").Value = Cells(lBuffer, "AS").Value
+    End If
+
+End Sub
+Private Sub FGenerar_Click()
+Dim lError As Long
+Dim lFolio As Double
+Dim lSerie As String * 11
+Dim lDocto As tDocumento
+Dim lIdDocumento As Long
+Dim lIdMovto As Long
+Dim lRenglon As Long
+Dim lIdAlmacen As Long
+'Dim Nombre As String * 255
+Dim Nombre As String
+Dim Clave As String * 26
+Dim lCampoIVA As String
+Dim lCampoImpRetLocal As String
+Dim lCampoIEPS As String
+Dim lCampoSegundoIEPS As String
+Dim lCampoPorcentajeIVA As String
+Dim lCampoPorcentajeImpRetLocal As String
+Dim lCampoPorcentajeIEPS As String
+Dim lCampoPorcentajeSegundoIEPS As String
+Dim lCampoCalculoIEPS As String * 10
+Dim lFormulaIEPS As Long
+Dim lFormulaSegundoIEPS As Long
+Dim lFormulaIVA As Long
+Dim Estatus As Long
+Dim EsCFD As Long
+Dim VersionCFD As Long
+Dim Esquema As String * 26
+Dim Impuestos As String
+Dim Docto As tLlaveDocto
+Dim lLista() As String
+Dim lIVAIncluido As Long
+Dim lFormulaImpRetLocal As Long
+Dim lPrecio As Double
+Dim lIva As Double
+Dim lImpRetLocal As Double
+Dim lIEPS As Double
+Dim lSegundoIEPS As Double
+Dim lTasaCuotaIEPSActual As Integer
+Dim lTasaCuotaIEPSCalculoIVA As Integer
+Dim lTasaCuotaIEPSIVACalculado As Double
+Dim lTasaCuotaSegundoIEPSIVACalculado As Double
+Dim lDescuentos As Double
+Dim lTotal As Double
+Dim lUsaIEPS As Long
+Dim lNumMovtos As Long
+Dim lImpuesto As String * 10
+Dim lNumImpuesto As Long
+Dim lCampoCalculoImpRetLocal As String * 10
+Dim lUsaImpuesto As Long
+Dim lTotalCascada As Double
+Dim lBaseImpRetLocal As Double
+Dim lResultado As Long
+Dim lDoctoParam As String
+Dim lLlaveDocto As String
+
+    Range("FProceso").Value = ""
+    Application.StatusBar = Range("FProceso").Value
+    
+    If Range("CodigoConcepto").Value = "" Then
+        MsgBox "No se ha seleccionado el concepto.", vbOKOnly
+        Exit Sub
+    End If
+    
+    'If dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value) = 0 Then
+    Call comFacturaMain.dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value, lResultado)
+    If lResultado = 0 Then
+        'dbFieldNameChar hDbc, CONCEPTOS, "cNombreC01", Nombre, 255
+        Call comFacturaMain.dbFieldNameChar(hDbc, CONCEPTOS, "cNombreC01", Nombre, 255, lResultado)
+        Range("NombreConcepto").Value = Trim(fEliminaEspaciosNulos2(Nombre))
+        'dbFieldNameLong hDbc, CONCEPTOS, "cEstatus", Estatus
+        Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cEstatus", Estatus, lResultado)
+        If Estatus = 0 Then
+            MsgBox "El concepto está inactivo", vbOKOnly
+            Range("CodigoConcepto").Value = ""
+            Range("FReferencia").Value = ""
+            Exit Sub
+        Else
+            'dbFieldNameLong hDbc, CONCEPTOS, "cEsCFD", EsCFD
+            'dbFieldNameLong hDbc, CONCEPTOS, "cVerFacEle", VersionCFD
+            'dbFieldNameChar hDbc, CONCEPTOS, "cVerEsque", Esquema, 26
+            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cEsCFD", EsCFD, lResultado)
+            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cVerFacEle", VersionCFD, lResultado)
+            Call comFacturaMain.dbFieldNameChar(hDbc, CONCEPTOS, "cVerEsque", Esquema, 26, lResultado)
+            If EsCFD = 1 And VersionCFD = 2 And CDbl(Trim(fEliminaEspaciosNulos2(Esquema))) >= 3.3 Then
+            Else
+                MsgBox "El concepto debe de ser un CFDI versión 3.3", vbOKOnly
+                Range("CodigoConcepto").Value = ""
+                Range("FReferencia").Value = ""
+                Exit Sub
+            End If
+            
+            'Verificar si el concepto tiene habilitado el IEPS
+            If gNumeroImpuestoIEPS <> 0 Then
+                lImpuesto = "cUsaImpu0" + CStr(gNumeroImpuestoIEPS) + ""
+                'dbFieldNameLong hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto
+                Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto, lResultado)
+                If (lUsaImpuesto = 1 And Worksheets("Parámetros").Range("HabilitarIEPS").Value = "Habilitar") Or (lUsaImpuesto <> 1 And Worksheets("Parámetros").Range("HabilitarIEPS").Value = "Sin uso") Then
+                    MsgBox "El impuesto IEPS debe estar habilitado tanto en el concepto como en la hoja electrónica.", vbOKOnly
+                    Range("CodigoConcepto").Value = ""
+                    Range("FReferencia").Value = ""
+                    Exit Sub
+                End If
+            End If
+            
+            If gNumeroSegundoImpuestoIEPS <> 0 Then
+                lImpuesto = "cUsaImpu0" + CStr(gNumeroSegundoImpuestoIEPS) + ""
+                'dbFieldNameLong hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto
+                Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto, lResultado)
+                If (lUsaImpuesto = 1 And Worksheets("Parámetros").Range("HabilitarIEPS").Value = "Habilitar") Or (lUsaImpuesto <> 1 And Worksheets("Parámetros").Range("HabilitarIEPS").Value = "Sin uso") Then
+                    MsgBox "El impuesto IEPS debe estar habilitado tanto en el concepto como en la hoja electrónica.", vbOKOnly
+                    Range("CodigoConcepto").Value = ""
+                    Range("FReferencia").Value = ""
+                    Exit Sub
+                End If
+            End If
+            
+            'Se utiliza la misma validación del cálculo del impuesto local que en la primera implementación de dicho impuesto en la HE
+            If gNumeroImpRetLocal <> 0 Then
+                lImpuesto = "cUsaImpu0" + CStr(gNumeroImpRetLocal) + ""
+                'dbFieldNameLong hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto
+                Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lImpuesto, lUsaImpuesto, lResultado)
+                lCampoImpRetLocal = "cCfdImpu0" & gNumeroImpRetLocal
+                'dbGetTopNoLock hDbc, PARAMETROS, IxPARAMETROS
+                'dbFieldNameLong hDbc, PARAMETROS, lCampoImpRetLocal, lNumImpuesto
+                Call comFacturaMain.dbGetTopNoLock(hDbc, PARAMETROS, IxPARAMETROS, lResultado)
+                Call comFacturaMain.dbFieldNameLong(hDbc, PARAMETROS, lCampoImpRetLocal, lNumImpuesto, lResultado)
+                If lNumImpuesto = 5 Then
+                    If (lUsaImpuesto = 1 And Worksheets("Parámetros").Range("HabilitarImpRetLocal").Value = "Habilitar") Or (lUsaImpuesto <> 1 And Worksheets("Parámetros").Range("HabilitarImpRetLocal").Value = "Sin uso") Then
+                        MsgBox "La retención local debe estar habilitado tanto en el concepto como en la hoja electrónica.", vbOKOnly
+                        Range("CodigoConcepto").Value = ""
+                        Range("FReferencia").Value = ""
+                        Exit Sub
+                    Else
+                        If Worksheets("Parámetros").Range("TasaImpRetLocal").Value <> "" Then
+                            lCampoCalculoImpRetLocal = "cIdFormu07"
+                            'dbFieldNameLong hDbc, CONCEPTOS, lCampoCalculoImpRetLocal, lFormulaImpRetLocal
+                            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lCampoCalculoImpRetLocal, lFormulaImpRetLocal, lResultado)
+                            If lFormulaImpRetLocal <> 263 Then
+                                MsgBox "El concepto debe tener configurado el cálculo de la retención local como Retención(Neto - Descuentos).", vbOKOnly
+                                Range("CodigoConcepto").Value = ""
+                                Range("FReferencia").Value = ""
+                                Exit Sub
+                            End If
+                        End If
+                    End If
+                Else
+                    If (lUsaImpuesto = 1 And Worksheets("Parámetros").Range("HabilitarImpRetLocal").Value = "Habilitar") Or (lUsaImpuesto <> 1 And Worksheets("Parámetros").Range("HabilitarImpRetLocal").Value = "Sin uso") Then
+                        MsgBox "El impuesto local debe estar habilitado tanto en el concepto como en la hoja electrónica.", vbOKOnly
+                        Range("CodigoConcepto").Value = ""
+                        Range("FReferencia").Value = ""
+                        Exit Sub
+                    Else
+                        If Worksheets("Parámetros").Range("TasaImpRetLocal").Value <> "" Then
+                            lCampoCalculoImpRetLocal = "cIdFormu07"
+                            'dbFieldNameLong hDbc, CONCEPTOS, lCampoCalculoImpRetLocal, lFormulaImpRetLocal
+                            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lCampoCalculoImpRetLocal, lFormulaImpRetLocal, lResultado)
+                            If lFormulaImpRetLocal <> 61 Then
+                                MsgBox "El concepto debe tener configurado el cálculo del impuesto local como Neto - Descuentos.", vbOKOnly
+                                Range("CodigoConcepto").Value = ""
+                                Range("FReferencia").Value = ""
+                                Exit Sub
+                            End If
+                        End If
+                    End If
+                End If
+            End If
+        End If
+    End If
+        
+    If Range("CodigoCliente").Value = "" Then
+        MsgBox "No se ha seleccionado el cliente.", vbOKOnly
+        Exit Sub
+    End If
+    If Range("CodigoServicio").Value = "" Then
+        MsgBox "No se ha seleccionado el servicio.", vbOKOnly
+        Exit Sub
+    End If
+    Range("NombreServicio").Value = ""
+    'If dbGetNoLock(hDbc, PRODUCTOS, IxICODIGOT01, Range("CodigoServicio").Value) = 0 Then
+    Call comFacturaMain.dbGetNoLock(hDbc, PRODUCTOS, IxICODIGOT01, Range("CodigoServicio").Value, lResultado)
+    If lResultado = 0 Then
+        'dbFieldNameChar hDbc, PRODUCTOS, "cNombreP01", Nombre, 255
+        Call comFacturaMain.dbFieldNameChar(hDbc, PRODUCTOS, "cNombreP01", Nombre, 255, lResultado)
+        Range("NombreServicio").Value = Trim(fEliminaEspaciosNulos2(Nombre))
+        'dbFieldNameChar hDbc, PRODUCTOS, "cClaveSAT", Clave, 26
+        Call comFacturaMain.dbFieldNameChar(hDbc, PRODUCTOS, "cClaveSAT", Clave, 26, lResultado)
+        If Trim(fEliminaEspaciosNulos2(Clave)) = "01010101" Then
+        Else
+            MsgBox "El servicio debe de tener la clave SAT: 01010101", vbOKOnly
+            Range("CodigoServicio").Value = ""
+            Exit Sub
+        End If
+        'Clave = Space(26)
+        'dbFieldNameChar hDbc, PRODUCTOS, "cIdUniXML", Clave, 26
+        Call comFacturaMain.dbFieldNameChar(hDbc, PRODUCTOS, "cIdUniXML", Clave, 26, lResultado)
+        'If dbGetNoLock(hDbc, "MGW10026", "PrimaryKey", Trim(fEliminaEspaciosNulos2(Clave))) = 0 Then
+        Call comFacturaMain.dbGetNoLock(hDbc, "MGW10026", "PrimaryKey", Trim(fEliminaEspaciosNulos2(Clave)), lResultado)
+        If lResultado = 0 Then
+            'Clave = Space(26)
+            'dbFieldNameChar hDbc, "MGW10026", "cClaveInt", Clave, 26
+            Call comFacturaMain.dbFieldNameChar(hDbc, "MGW10026", "cClaveInt", Clave, 26, lResultado)
+        End If
+        If Trim(fEliminaEspaciosNulos2(Clave)) = "ACT" Then
+        Else
+            MsgBox "La unidad del servicio debe de tener la clave SAT: ACT", vbOKOnly
+            Range("CodigoServicio").Value = ""
+            Exit Sub
+        End If
+    End If
+   
+    'dbGetTopNoLock hDbc, PARAMETROS, IxPARAMETROS
+    'dbFieldNameLong hDbc, PARAMETROS, "cIdAlmac01", lIdAlmacen
+    'dbFieldNameLong hDbc, PARAMETROS, "cPrecios01", lIVAIncluido
+    Call comFacturaMain.dbGetTopNoLock(hDbc, PARAMETROS, IxPARAMETROS, lResultado)
+    Call comFacturaMain.dbFieldNameLong(hDbc, PARAMETROS, "cIdAlmac01", lIdAlmacen, lResultado)
+    Call comFacturaMain.dbFieldNameLong(hDbc, PARAMETROS, "cPrecios01", lIVAIncluido, lResultado)
+    
+    If lIdAlmacen = 0 Then
+        lIdAlmacen = 1
+    End If
+    lCampoIVA = "cImpuesto" & gNumeroImpuestoIVA
+    lCampoPorcentajeIVA = "cPorcentajeImpuesto" & gNumeroImpuestoIVA
+    If gNumeroImpuestoIEPS <> 0 Then
+        lCampoIEPS = "cImpuesto" & gNumeroImpuestoIEPS
+        lCampoPorcentajeIEPS = "cPorcentajeImpuesto" & gNumeroImpuestoIEPS
+    End If
+    If gNumeroSegundoImpuestoIEPS <> 0 Then
+        lCampoSegundoIEPS = "cImpuesto" & gNumeroSegundoImpuestoIEPS
+        lCampoPorcentajeSegundoIEPS = "cPorcentajeImpuesto" & gNumeroSegundoImpuestoIEPS
+    End If
+    If gNumeroImpRetLocal <> 0 Then
+        lCampoImpRetLocal = "cImpuesto" & gNumeroImpRetLocal
+        lCampoPorcentajeImpRetLocal = "cPorcentajeImpuesto" & gNumeroImpRetLocal
+    End If
+
+    '.Unprotect
+    ' Abre la empresa
+    Range("FProceso").Value = "Apertura de la empresa..."
+    Application.StatusBar = Range("FProceso").Value
+    DirectorioBase
+    'lError = fAbreEmpresa(Worksheets("Parámetros").Range("UbicacionEmpresa").Value)
+    Call comFacturaMain.AbreEmpresa(Worksheets("Parámetros").Range("UbicacionEmpresa").Value, lError)
+    If lError <> 0 Then
+        MsgBox MensajeError(lError), vbOKOnly
+        Exit Sub
+    End If
+            
+    Application.DisplayAlerts = False
+    
+    ' Crea del documento
+    Range("FProceso").Value = "Generando el documento..."
+    Application.StatusBar = Range("FProceso").Value
+    'lError = fSiguienteFolio(Range("CodigoConcepto").Value, lSerie, lFolio)
+    Call comFacturaMain.SiguienteFolio(Range("CodigoConcepto").Value, lSerie, lFolio, lError)
+    If lError <> 0 Then
+        MsgBox MensajeError(lError), vbOKOnly
+        GoTo FinFuncion
+    End If
+    lDocto.aFolio = CDbl(lFolio)
+    lDocto.aNumMoneda = CLng(Range("FCodMoneda").Value)
+    lDocto.aTipoCambio = CDbl(Range("FTipoCambio").Value)
+    lDocto.aImporte = CDbl(0)
+    lDocto.aDescuentoDoc1 = CDbl(0)
+    lDocto.aDescuentoDoc2 = CDbl(0)
+    lDocto.aSistemaOrigen = CInt(101)
+    lDocto.aAfecta = CLng(0)
+    lDocto.aCodConcepto = fEliminaEspaciosNulos2(Range("CodigoConcepto").Value)
+    fRellenaConBlancos lDocto.aCodConcepto, kLongCodigo
+    lDocto.aSerie = fEliminaEspaciosNulos2(lSerie)
+    fRellenaConBlancos lDocto.aSerie, kLongNumSerie
+    lDocto.aFecha = fEliminaEspaciosNulos2(Format(Range("FFecha").Value, "MM/DD/YYYY"))
+    fRellenaConBlancos lDocto.aFecha, kLongFecha
+    lDocto.aCodigoAgente = ""
+    fRellenaConBlancos lDocto.aCodigoAgente, kLongCodigo
+    lDocto.aCodigoCteProv = fEliminaEspaciosNulos2(Range("CodigoCliente").Value)
+    fRellenaConBlancos lDocto.aCodigoCteProv, kLongCodigo
+    lDocto.aReferencia = fEliminaEspaciosNulos2(Range("Referencia").Value)
+    fRellenaConBlancos lDocto.aReferencia, kLongReferencia
+    'lError = fAltaDocumento(lIdDocumento, lDocto)
+    lDoctoParam = lDocto.aFolio & kTokenSeparador & lDocto.aNumMoneda & kTokenSeparador & lDocto.aTipoCambio & kTokenSeparador & lDocto.aImporte & kTokenSeparador & _
+      lDocto.aDescuentoDoc1 & kTokenSeparador & lDocto.aDescuentoDoc2 & kTokenSeparador & lDocto.aSistemaOrigen & kTokenSeparador & _
+      fEliminaEspaciosNulos2(Range("CodigoConcepto").Value) & kTokenSeparador & lSerie & kTokenSeparador & fEliminaEspaciosNulos2(Format(Range("FFecha").Value, "MM/DD/YYYY")) & kTokenSeparador & _
+      fEliminaEspaciosNulos2(Range("CodigoCliente").Value) & kTokenSeparador & "" & kTokenSeparador & fEliminaEspaciosNulos2(Range("Referencia").Value) & kTokenSeparador & _
+      lDocto.aAfecta & kTokenSeparador & "0" & kTokenSeparador & "0" & kTokenSeparador & "0" & kTokenSeparador
+    Call comFacturaMain.AltaDocumento(lIdDocumento, lDoctoParam, lError)
+    If lError = 0 Then
+        'lError = fEditarDocumento()
+        Call comFacturaMain.EditarDocumento(lError)
+        If lError = 0 Then
+            'lError = fSetDatoDocumento("cSistOrig", 101)
+            'lError = fSetDatoDocumento("cUsoCFDI", "P01")
+            'lError = fGuardaDocumento()
+            Call comFacturaMain.SetDatoDocumento("cSistOrig", 101, lError)
+            Call comFacturaMain.SetDatoDocumento("cUsoCFDI", "P01", lError)
+            Call comFacturaMain.GuardaDocumento(lError)
+        End If
+    End If
+    If lError <> 0 Then
+        MsgBox MensajeError(lError), vbOKOnly
+        GoTo FinFuncion
+    End If
+            
+    'Procesa los renglones para crear los ajustes
+    lRenglon = kRenTickets
+    lNumMovtos = 0
+    While Trim(Cells(lRenglon, kColTicket).Value) <> "" And lError = 0
+        Range("FProceso").Value = "Procesando movimiento " & lRenglon - kRenTickets + 1
+        Application.StatusBar = Range("FProceso").Value
+        
+        lPrecio = 0#
+        lDescuentos = 0#
+        lIva = 0#
+        lImpRetLocal = 0#
+        lIEPS = 0#
+        lSegundoIEPS = 0#
+        lTotal = 0#
+        Impuestos = ""
+             
+        'dbFieldNameLong hDbc, CONCEPTOS, "cIdFormu07", lFormulaIVA
+        If gNumeroImpuestoIVA = 2 Then
+            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cIdFormu07", lFormulaIVA, lResultado)
+        Else
+            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cIdFormu09", lFormulaIVA, lResultado)
+        End If
+        If gNumeroImpuestoIVA = 1 Or (gNumeroImpuestoIVA = 2 And lFormulaIVA = 61) Or (gNumeroImpuestoIVA = 3 And lFormulaIVA = 71) Then
+            If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                lDescuentos = Cells(lRenglon, kColIvaGeneral + 1).Value
+                If lIVAIncluido = 0 Then
+                    lPrecio = Round((Cells(lRenglon, kColIvaGeneral).Value), 2)
+                    lIva = Round(CDbl(Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * (gTasaIVA), 2)
+                    lTotal = (Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIVA)
+                Else
+                    lPrecio = (Cells(lRenglon, kColIvaGeneral).Value / (1 + (gTasaIVA)))
+                    lIva = Round(CDbl((Cells(lRenglon, kColIvaGeneral).Value / (1 + (gTasaIVA))) - Cells(lRenglon, kColIvaGeneral + 1).Value) * (gTasaIVA), 2)
+                    lTotal = (Cells(lRenglon, kColIvaGeneral).Value / (1 + gTasaIVA)) - Cells(lRenglon, kColIvaGeneral + 1).Value + lIva
+                End If
+            End If
+            If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                lPrecio = lPrecio + Cells(lRenglon, kColIvaTasa0).Value
+                lDescuentos = lDescuentos + Cells(lRenglon, kColIvaTasa0 + 1).Value
+                lTotal = lTotal + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)
+            End If
+            If CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 Then
+                lPrecio = lPrecio + Cells(lRenglon, kColIvaExento).Value
+                lDescuentos = lDescuentos + Cells(lRenglon, kColIvaExento + 1).Value
+                lTotal = lTotal + (Cells(lRenglon, kColIvaExento).Value - Cells(lRenglon, kColIvaExento + 1).Value)
+            End If
+            If lIVAIncluido = 1 Then
+                lPrecio = lPrecio * (1 + gTasaIVA)
+            End If
+            If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIVA & " Tasa " & gTasaIVA & " Base "
+                If lIVAIncluido = 0 Then
+                    Impuestos = Impuestos & Round((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value), 2)
+                Else
+                    Impuestos = Impuestos & Round(((Cells(lRenglon, kColIvaGeneral).Value / (1 + (gTasaIVA))) - Cells(lRenglon, kColIvaGeneral + 1).Value), 2)
+                End If
+                Impuestos = Impuestos & " Total " & Round(lIva, 2) & vbCrLf
+            End If
+            If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIVA & " Tasa 0.000000 Base " & Round((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value), 2) & " Total 0.000000 " & vbCrLf
+            End If
+            If CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 Then
+                Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIVA & " Tasa Exento Base " & Round((Cells(lRenglon, kColIvaExento).Value - Cells(lRenglon, kColIvaExento + 1).Value), 2) & " Total 0.000000" & vbCrLf
+            End If
+        Else
+            If CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 Then
+                lPrecio = lPrecio + Cells(lRenglon, kColIvaExento).Value
+                lDescuentos = lDescuentos + Cells(lRenglon, kColIvaExento + 1).Value
+                lTotal = lTotal + (Cells(lRenglon, kColIvaExento).Value - Cells(lRenglon, kColIvaExento + 1).Value)
+                Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIVA & " Tasa Exento Base " & Round((Cells(lRenglon, kColIvaExento).Value - Cells(lRenglon, kColIvaExento + 1).Value), 2) & " Total 0.000000" & vbCrLf
+            End If
+        End If
+               
+        If gNumeroImpuestoIEPS <> 0 Then
+            lTasaCuotaIEPSActual = 0
+            lIEPS = 0
+            lTotalCascada = lTotal
+            If CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 Then
+                lTotalCascada = lTotalCascada - (Cells(lRenglon, kColIvaExento).Value - Cells(lRenglon, kColIvaExento + 1).Value)
+            End If
+            While lTasaCuotaIEPSActual < CInt(Worksheets("Parámetros").Range("CantidadTasasCuotas").Value)
+                If CDbl(Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value) <> 0 Then
+                    'lIEPS = 0
+                    If Worksheets("Parámetros").Range("TasaOCuotaIEPS").Value = "Tasa" Then
+                        gTasaIEPS = CDbl(Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value) / 100
+                        'If dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value) = 0 Then
+                        Call comFacturaMain.dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value, lResultado)
+                        If lResultado = 0 Then
+                            Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIEPS & " Tasa " & gTasaIEPS & " Base "
+                            If gNumeroImpuestoIEPS = 1 Then
+                                lCampoCalculoIEPS = "cIdFormu05"
+                            Else
+                                If gNumeroImpuestoIEPS = 2 Then
+                                    lCampoCalculoIEPS = "cIdFormu07"
+                                End If
+                            End If
+                            'dbFieldNameLong hDbc, CONCEPTOS, lCampoCalculoIEPS, lFormulaIEPS
+                            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lCampoCalculoIEPS, lFormulaIEPS, lResultado)
+                                             
+                            If gNumeroImpuestoIEPS = 1 Or lFormulaIEPS = 61 Or lFormulaIEPS = 51 Then
+                                If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 And CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                                    lIEPS = lIEPS + (((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)) * gTasaIEPS)
+                                    Impuestos = Impuestos & Round((Cells(lRenglon, kColBaseIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                                    Impuestos = Impuestos & " Total " & Round((((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)) * gTasaIEPS), 2) & vbCrLf
+                                Else
+                                    If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                        lIEPS = lIEPS + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIEPS)
+                                        Impuestos = Impuestos & Round((Cells(lRenglon, kColBaseIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                                        Impuestos = Impuestos & " Total " & Round(((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIEPS), 2) & vbCrLf
+                                    Else
+                                        lIEPS = lIEPS + ((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaIEPS)
+                                        Impuestos = Impuestos & Round((Cells(lRenglon, kColBaseIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                                        Impuestos = Impuestos & " Total " & Round(((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaIEPS), 2) & vbCrLf
+                                    End If
+                                End If
+                                If (gNumeroImpuestoIVA = 2 And lFormulaIVA = 63) Or (gNumeroImpuestoIVA = 3 And lFormulaIVA = 73) Then
+                                    If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                    
+                                        lTasaCuotaIEPSCalculoIVA = 0
+                                        lTasaCuotaIEPSIVACalculado = 0
+                                        While lTasaCuotaIEPSCalculoIVA < CInt(Worksheets("Parámetros").Range("CantidadTasasCuotas").Value)
+                                            lTasaCuotaIEPSIVACalculado = lTasaCuotaIEPSIVACalculado + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * (CDbl(Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSCalculoIVA * 2)).Value) / 100))
+                                            lTasaCuotaIEPSCalculoIVA = lTasaCuotaIEPSCalculoIVA + 1
+                                        Wend
+                                    
+                                        'lIva = Round(((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIEPS)) * gTasaIVA, 2)
+                                    End If
+                                End If
+                            Else
+                                lIEPS = lIEPS + (lTotalCascada * gTasaIEPS)
+                                Impuestos = Impuestos & Round((Cells(lRenglon, kColBaseIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2) & " Total " & Round((lTotalCascada * gTasaIEPS), 2) & vbCrLf
+                                lTasaCuotaIEPSIVACalculado = lIEPS
+                            End If
+                        End If
+                    Else
+                        lIEPS = lIEPS + (CDbl(Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value))
+                        Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIEPS & " Cuota "
+                        Impuestos = Impuestos & Round((Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                        Impuestos = Impuestos & " Base " & Round((Cells(lRenglon, kColBaseIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                        Impuestos = Impuestos & " Total " & Round((Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2) & vbCrLf
+                        
+                        If (gNumeroImpuestoIVA = 2 And lFormulaIVA = 63) Or (gNumeroImpuestoIVA = 3 And lFormulaIVA = 73) Then
+                            If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                lTasaCuotaIEPSCalculoIVA = 0
+                                lTasaCuotaIEPSIVACalculado = 0
+                                While lTasaCuotaIEPSCalculoIVA < CInt(Worksheets("Parámetros").Range("CantidadTasasCuotas").Value)
+                                    lTasaCuotaIEPSIVACalculado = lTasaCuotaIEPSIVACalculado + Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSCalculoIVA * 2)).Value
+                                    lTasaCuotaIEPSCalculoIVA = lTasaCuotaIEPSCalculoIVA + 1
+                                Wend
+                            End If
+                        End If
+                    End If
+                    
+                End If
+                lTasaCuotaIEPSActual = lTasaCuotaIEPSActual + 1
+            Wend
+            If gNumeroImpuestoIVA = 2 And lFormulaIVA = 63 Then
+                If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                    lDescuentos = Cells(lRenglon, kColIvaGeneral + 1).Value
+                    lPrecio = Round((Cells(lRenglon, kColIvaGeneral).Value), 2)
+                    lIva = Round(((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + lTasaCuotaIEPSIVACalculado) * gTasaIVA, 2)
+                End If
+                If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                    lPrecio = lPrecio + Cells(lRenglon, kColIvaTasa0).Value
+                    lDescuentos = lDescuentos + Cells(lRenglon, kColIvaTasa0 + 1).Value
+                    'lTotal = lTotal + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)
+                End If
+                If lIVAIncluido = 1 Then
+                    lPrecio = lPrecio * (1 + gTasaIVA)
+                End If
+                                    
+                If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                    Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIVA & " Tasa " & gTasaIVA & " Base "
+                    Impuestos = Impuestos & Round((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + lTasaCuotaIEPSIVACalculado, 2)
+                    Impuestos = Impuestos & " Total " & Round(lIva, 2) & vbCrLf
+                End If
+                If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                    Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIVA & " Tasa 0.000000 Base " & Round((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) + lIEPS, 2) & " Total 0.000000 " & vbCrLf
+                End If
+            End If
+        End If
+        
+        If gNumeroSegundoImpuestoIEPS <> 0 Then
+            lTasaCuotaIEPSActual = 0
+            lSegundoIEPS = 0
+            If gNumeroImpuestoIVA = 1 Or (gNumeroImpuestoIVA = 2 And lFormulaIVA = 61) Then
+                lTotalCascada = lTotal + lIEPS
+            Else
+                If (gNumeroImpuestoIVA = 3 And lFormulaIVA = 71) Then
+                    lTotalCascada = lTotal + lIEPS - lIva
+                Else
+                    If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                        lTotalCascada = (Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value)
+                    End If
+                    If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                        lTotalCascada = lTotalCascada + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)
+                    End If
+                    lTotalCascada = lTotalCascada + lIEPS
+                End If
+            End If
+            'lTotalCascada = lTotal + lIEPS
+            If CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 And ((CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0) Or (CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0)) Then
+                lTotalCascada = lTotalCascada - (Cells(lRenglon, kColIvaExento).Value - Cells(lRenglon, kColIvaExento + 1).Value) + lIEPS
+            End If
+            While lTasaCuotaIEPSActual < CInt(Worksheets("Parámetros").Range("CantidadTasasCuotasSegundoIEPS").Value)
+                If CDbl(Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value) <> 0 Then
+                    If Worksheets("Parámetros").Range("TasaOCuotaSegundoIEPS").Value = "Tasa" Then
+                        gTasaSegundoIEPS = CDbl(Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value) / 100
+                        'If dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value) = 0 Then
+                        Call comFacturaMain.dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value, lResultado)
+                        If lResultado = 0 Then
+                            Impuestos = Impuestos & "Impuesto" & gNumeroSegundoImpuestoIEPS & " Tasa " & gTasaSegundoIEPS & " Base "
+                            If gNumeroSegundoImpuestoIEPS = 2 Then
+                                lCampoCalculoIEPS = "cIdFormu07"
+                            Else
+                                If gNumeroSegundoImpuestoIEPS = 3 Then
+                                    lCampoCalculoIEPS = "cIdFormu09"
+                                End If
+                            End If
+                            'dbFieldNameLong hDbc, CONCEPTOS, lCampoCalculoIEPS, lFormulaIEPS
+                            Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lCampoCalculoIEPS, lFormulaIEPS, lResultado)
+                                             
+                            If lFormulaIEPS = 61 Or lFormulaIEPS = 64 Or lFormulaIEPS = 71 Then
+                                If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 And CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                                    lSegundoIEPS = lSegundoIEPS + (((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)) * gTasaSegundoIEPS)
+                                    Impuestos = Impuestos & Round((Cells(lRenglon, kColBaseSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                                    Impuestos = Impuestos & " Total " & Round((((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)) * gTasaSegundoIEPS), 2) & vbCrLf
+                                Else
+                                    If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                        lSegundoIEPS = lSegundoIEPS + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaSegundoIEPS)
+                                        Impuestos = Impuestos & Round((Cells(lRenglon, kColBaseSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                                        Impuestos = Impuestos & " Total " & Round(((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaSegundoIEPS), 2) & vbCrLf
+                                    Else
+                                        lSegundoIEPS = lSegundoIEPS + ((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaSegundoIEPS)
+                                        Impuestos = Impuestos & Round((Cells(lRenglon, kColBaseSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                                        Impuestos = Impuestos & " Total " & Round(((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaSegundoIEPS), 2) & vbCrLf
+                                    End If
+                                End If
+                                If gNumeroImpuestoIVA = 3 And lFormulaIVA = 73 Then
+                                    If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                    
+                                        lTasaCuotaIEPSCalculoIVA = 0
+                                        lTasaCuotaSegundoIEPSIVACalculado = 0
+                                        While lTasaCuotaIEPSCalculoIVA < CInt(Worksheets("Parámetros").Range("CantidadTasasCuotasSegundoIEPS").Value)
+                                            lTasaCuotaSegundoIEPSIVACalculado = lTasaCuotaSegundoIEPSIVACalculado + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * (CDbl(Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSCalculoIVA * 2)).Value) / 100))
+                                            lTasaCuotaIEPSCalculoIVA = lTasaCuotaIEPSCalculoIVA + 1
+                                        Wend
+                                    
+                                        'lIva = Round(((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIEPS)) * gTasaIVA, 2)
+                                    End If
+                                End If
+                            Else
+                                lSegundoIEPS = lSegundoIEPS + (lTotalCascada * gTasaSegundoIEPS)
+                                Impuestos = Impuestos & Round((Cells(lRenglon, kColBaseSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2) & " Total " & Round((lTotalCascada * gTasaSegundoIEPS), 2) & vbCrLf
+                                lTasaCuotaSegundoIEPSIVACalculado = lSegundoIEPS
+                            End If
+                        End If
+                    Else
+                        lSegundoIEPS = lSegundoIEPS + (CDbl(Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value))
+                        Impuestos = Impuestos & "Impuesto" & gNumeroSegundoImpuestoIEPS & " Cuota "
+                        Impuestos = Impuestos & Round((Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                        Impuestos = Impuestos & " Base " & Round((Cells(lRenglon, kColBaseSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2)
+                        Impuestos = Impuestos & " Total " & Round((Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value), 2) & vbCrLf
+                        
+                        If gNumeroImpuestoIVA = 3 And lFormulaIVA = 73 Then
+                            If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                lTasaCuotaIEPSCalculoIVA = 0
+                                lTasaCuotaSegundoIEPSIVACalculado = 0
+                                While lTasaCuotaIEPSCalculoIVA < CInt(Worksheets("Parámetros").Range("CantidadTasasCuotasSegundoIEPS").Value)
+                                    lTasaCuotaSegundoIEPSIVACalculado = lTasaCuotaSegundoIEPSIVACalculado + Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSCalculoIVA * 2)).Value
+                                    lTasaCuotaIEPSCalculoIVA = lTasaCuotaIEPSCalculoIVA + 1
+                                Wend
+                            End If
+                        End If
+                    End If
+                    
+                End If
+                lTasaCuotaIEPSActual = lTasaCuotaIEPSActual + 1
+            Wend
+            If gNumeroImpuestoIVA = 3 And lFormulaIVA = 73 Then
+                If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                    lDescuentos = Cells(lRenglon, kColIvaGeneral + 1).Value
+                    lPrecio = Round((Cells(lRenglon, kColIvaGeneral).Value), 2)
+                    lIva = Round(((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + lTasaCuotaIEPSIVACalculado + lTasaCuotaSegundoIEPSIVACalculado) * gTasaIVA, 2)
+                End If
+                If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                    lPrecio = lPrecio + Cells(lRenglon, kColIvaTasa0).Value
+                    lDescuentos = lDescuentos + Cells(lRenglon, kColIvaTasa0 + 1).Value
+                    'lTotal = lTotal + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)
+                End If
+                If lIVAIncluido = 1 Then
+                    lPrecio = lPrecio * (1 + gTasaIVA)
+                End If
+                                    
+                If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                    Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIVA & " Tasa " & gTasaIVA & " Base "
+                    Impuestos = Impuestos & Round((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + lTasaCuotaIEPSIVACalculado + lTasaCuotaSegundoIEPSIVACalculado, 2)
+                    Impuestos = Impuestos & " Total " & Round(lIva, 2) & vbCrLf
+                End If
+                If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                    Impuestos = Impuestos & "Impuesto" & gNumeroImpuestoIVA & " Tasa 0.000000 Base " & Round((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value), 2) & " Total 0.000000 " & vbCrLf
+                End If
+            End If
+        End If
+        
+        If gNumeroImpRetLocal <> 0 Then
+            If CDbl(Cells(lRenglon, kColImpuestoLocal).Value) <> 0 Then
+                lBaseImpRetLocal = 0
+                Impuestos = Impuestos & "Impuesto" & gNumeroImpRetLocal & " Tasa " & gTasaImpRetLocal * 100 & " Base "
+                If gIncluirTasasIVA = 1 Or gIncluirTasasIVA = 2 Then
+                    Impuestos = Impuestos & Round((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value), 2)
+                    Impuestos = Impuestos & " Total " & Round(((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaImpRetLocal), 2) & vbCrLf
+                    lImpRetLocal = Round((CDbl(Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaImpRetLocal), 2)
+                Else
+                    If gIncluirTasasIVA = 3 Or gIncluirTasasIVA = 4 Then
+                        If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                            lBaseImpRetLocal = (Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value)
+                        End If
+                            
+                        If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                            lBaseImpRetLocal = lBaseImpRetLocal + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)
+                        End If
+                        Impuestos = Impuestos & Round(lBaseImpRetLocal, 2)
+                        Impuestos = Impuestos & " Total " & Round((lBaseImpRetLocal * gTasaImpRetLocal), 2) & vbCrLf
+                        lImpRetLocal = Round((lBaseImpRetLocal * gTasaImpRetLocal), 2)
+                    End If
+                End If
+            End If
+        End If
+        
+        If lPrecio > 0 And lPrecio > lDescuentos Then
+            'lError = fInsertarMovimiento
+            Call comFacturaMain.InsertarMovimiento(lError)
+            If lError = 0 Then
+'                lError = fSetDatoMovimiento("cIdDocumento", CStr(lIdDocumento))
+'                lError = fSetDatoMovimiento("cIdDocumentoDe", "4")
+'                lError = fSetDatoMovimiento("cAfectaExistencia", "3")
+'                lError = fSetDatoMovimiento("cMovtoOculto", "0")
+'                'lError = fSetDatoMovimiento("cAfectadoSaldos", "0")
+'                'lError = fSetDatoMovimiento("cAfectadoInventario", "0")
+'                'lError = fSetDatoMovimiento("cFecha", lDocto.aFecha)
+'                'lError = fSetDatoMovimiento("cTipoTraspaso", "1")
+'                lError = fSetDatoMovimiento("cIdAlmacen", CStr(lIdAlmacen))
+'                lError = fSetDatoMovimiento("cNumeroMovimiento", CStr(lRenglon - kRenTickets))
+'                lError = fSetDatoMovimiento("cCodigoProducto", Range("CodigoServicio").Value)
+'                lError = fSetDatoMovimiento("cUnidades", "1.00")
+'                lError = fSetDatoMovimiento("cUnidadesCapturadas", "1.00")
+'                'lError = fSetDatoMovimiento("cUnidadesPendientes", "1.00")
+'                'lError = fSetDatoMovimiento("cIdUnidad", CStr(lIdUnidad))
+                Call comFacturaMain.SetDatoMovimiento("cIdDocumento", CStr(lIdDocumento), lError)
+                Call comFacturaMain.SetDatoMovimiento("cIdDocumentoDe", "4", lError)
+                Call comFacturaMain.SetDatoMovimiento("cAfectaExistencia", "3", lError)
+                Call comFacturaMain.SetDatoMovimiento("cMovtoOculto", "0", lError)
+                Call comFacturaMain.SetDatoMovimiento("cIdAlmacen", CStr(lIdAlmacen), lError)
+                Call comFacturaMain.SetDatoMovimiento("cNumeroMovimiento", CStr(lRenglon - kRenTickets), lError)
+                Call comFacturaMain.SetDatoMovimiento("cCodigoProducto", Range("CodigoServicio").Value, lError)
+                Call comFacturaMain.SetDatoMovimiento("cUnidades", "1.00", lError)
+                Call comFacturaMain.SetDatoMovimiento("cUnidadesCapturadas", "1.00", lError)
+                If lIVAIncluido = 0 Then
+                    'lError = fSetDatoMovimiento("cPrecio", lPrecio)
+                    Call comFacturaMain.SetDatoMovimiento("cPrecio", lPrecio, lError)
+                Else
+                    'lError = fSetDatoMovimiento("cPrecio", Round(lPrecio / (1 + (gTasaIVA)), 2))
+                    Call comFacturaMain.SetDatoMovimiento("cPrecio", Round(lPrecio / (1 + (gTasaIVA)), 2), lError)
+                End If
+                'lError = fSetDatoMovimiento("cPrecioCapturado", lPrecio)
+                'lError = fSetDatoMovimiento("cDescuento1", lDescuentos)
+                'lError = fSetDatoMovimiento(lCampoPorcentajeIVA, CDbl(gTasaIVA * 100))
+                'lError = fSetDatoMovimiento(lCampoIVA, CDbl(lIva))
+                Call comFacturaMain.SetDatoMovimiento("cPrecioCapturado", lPrecio, lError)
+                Call comFacturaMain.SetDatoMovimiento("cDescuento1", lDescuentos, lError)
+                Call comFacturaMain.SetDatoMovimiento(lCampoPorcentajeIVA, CDbl(gTasaIVA * 100), lError)
+                Call comFacturaMain.SetDatoMovimiento(lCampoIVA, CDbl(lIva), lError)
+                If CDbl(Cells(lRenglon, kColImpuestoLocal).Value) <> 0 Then
+                    'lError = fSetDatoMovimiento(lCampoPorcentajeImpRetLocal, CDbl(gTasaImpRetLocal * 100))
+                    'lError = fSetDatoMovimiento(lCampoImpRetLocal, CDbl(lImpRetLocal))
+                    Call comFacturaMain.SetDatoMovimiento(lCampoPorcentajeImpRetLocal, CDbl(gTasaImpRetLocal * 100), lError)
+                    Call comFacturaMain.SetDatoMovimiento(lCampoImpRetLocal, CDbl(lImpRetLocal), lError)
+                End If
+                If CDbl(Cells(lRenglon, kColTasaCuotaIEPS1).Value) <> 0 Then
+                    If Worksheets("Parámetros").Range("TasaOCuotaIEPS").Value = "Tasa" Then
+                        'lError = fSetDatoMovimiento(lCampoPorcentajeIEPS, CDbl(gTasaIEPS * 100))
+                        Call comFacturaMain.SetDatoMovimiento(lCampoPorcentajeIEPS, CDbl(gTasaIEPS * 100), lError)
+                    End If
+                    'lError = fSetDatoMovimiento(lCampoIEPS, CDbl(lIEPS))
+                    Call comFacturaMain.SetDatoMovimiento(lCampoIEPS, CDbl(lIEPS), lError)
+                End If
+                If CDbl(Cells(lRenglon, kColTasaCuotaSegundoIEPS1).Value) <> 0 Then
+                    If Worksheets("Parámetros").Range("TasaOCuotaSegundoIEPS").Value = "Tasa" Then
+                        'lError = fSetDatoMovimiento(lCampoPorcentajeIEPS, CDbl(gTasaIEPS * 100))
+                        Call comFacturaMain.SetDatoMovimiento(lCampoPorcentajeSegundoIEPS, CDbl(gTasaSegundoIEPS * 100), lError)
+                    End If
+                    'lError = fSetDatoMovimiento(lCampoIEPS, CDbl(lIEPS))
+                    Call comFacturaMain.SetDatoMovimiento(lCampoSegundoIEPS, CDbl(lSegundoIEPS), lError)
+                End If
+                'lError = fSetDatoMovimiento("cReferencia", Cells(lRenglon, kColTicket).Value)
+                'lError = fSetDatoMovimiento("cObservaMov", Impuestos)
+                Call comFacturaMain.SetDatoMovimiento("cReferencia", Cells(lRenglon, kColTicket).Value, lError)
+                Call comFacturaMain.SetDatoMovimiento("cObservaMov", Impuestos, lError)
+            End If
+            If lError <> 0 Then
+                'lError = fCancelaCambiosMovimiento
+                Call comFacturaMain.CancelaCambiosMovimiento(lError)
+            Else
+                'lError = fGuardaMovto(0)
+                Call comFacturaMain.GuardaMovto(0, lError)
+                lNumMovtos = lNumMovtos + 1
+            End If
+        End If
+        lRenglon = lRenglon + 1
+    Wend
+    
+    If lError = 0 Then
+        'lError = fAfectaMovtos(1)
+    End If
+    If lError = 0 Then
+        Range("FProceso").Value = "Afectando el documento"
+        'Docto.aCodConcepto = lDocto.aCodConcepto
+        'Docto.aSerie = lDocto.aSerie
+        'Docto.aFolio = lDocto.aFolio
+        ' Afecta el documento que se acaba de generar.
+        'lError = fAfectaDocto(Docto, 1)
+        lLlaveDocto = Range("CodigoConcepto").Value & kTokenSeparador & lSerie & kTokenSeparador & lDocto.aFolio & kTokenSeparador & kTokenSeparador
+        Call comFacturaMain.AfectaDocto(lLlaveDocto, 1, lError)
+    End If
+    If lError = 0 Then
+        lLista = Split(Range("FormaDePago").Value, "=") '01=Descripcion
+        'lError = fEditarDocumento()
+        Call comFacturaMain.EditarDocumento(lError)
+        If lError = 0 Then
+            'lError = fSetDatoDocumento("cSistOrig", 101)
+            'lError = fSetDatoDocumento("cMetodoPag", Trim(lLista(0)))
+            'lError = fSetDatoDocumento("cCantParci", "1")
+            'lError = fGuardaDocumento()
+            Call comFacturaMain.SetDatoDocumento("cSistOrig", 101, lError)
+            Call comFacturaMain.SetDatoDocumento("cMetodoPag", Trim(lLista(0)), lError)
+            Call comFacturaMain.SetDatoDocumento("cCantParci", "1", lError)
+            Call comFacturaMain.GuardaDocumento(lError)
+        End If
+    End If
+    
+    If lError = 0 And lNumMovtos = 0 Then
+        MsgBox "El documento se generó sin movimientos." & vbCrLf & "Usted puede entrar al sistema y borrarlo de forma manual.", vbOKOnly
+    End If
+    If lError <> 0 Then
+        MsgBox MensajeError(lError), vbOKOnly
+        If lIdDocumento > 0 Then
+            lError = fBorraDocumento
+            If lError <> 0 Then
+                If lError = 41717 Then
+                    If Trim(fEliminaEspaciosNulos2(lDocto.aSerie)) = "" Then
+                        Range("FProceso").Value = Range("NombreConcepto").Value & " folio " & CStr(lDocto.aFolio) & " / Movimientos: " & lNumMovtos
+                    Else
+                        Range("FProceso").Value = Range("NombreConcepto").Value & " serie " & Trim(fEliminaEspaciosNulos2(lDocto.aSerie)) & " folio " & CStr(lDocto.aFolio) & " / Movimientos: " & lNumMovtos
+                    End If
+                    MsgBox "El documento generado no se puede borrar, entre al sistema y bórrelo de forma manual.", vbOKOnly
+                Else
+                    MsgBox MensajeError(lError), vbOKOnly
+                End If
+            End If
+        End If
+        GoTo FinFuncion
+    End If
+    
+    If lError = 0 Then
+        If Trim(fEliminaEspaciosNulos2(lDocto.aSerie)) = "" Then
+            Range("FProceso").Value = Range("NombreConcepto").Value & " folio " & CStr(lDocto.aFolio) & " / Movimientos: " & lNumMovtos
+        Else
+            Range("FProceso").Value = Range("NombreConcepto").Value & " serie " & Trim(fEliminaEspaciosNulos2(lDocto.aSerie)) & " folio " & CStr(lDocto.aFolio) & " / Movimientos: " & lNumMovtos
+        End If
+    End If
+    
+FinFuncion:
+    
+   'Call fCierraEmpresa
+   Call comFacturaMain.CierraEmpresa
+    Application.DisplayAlerts = True
+   
+   Application.StatusBar = ""
+   
+   '.Protect
+End Sub
+
+Private Sub FDesplegar_Click()
+    DesplegarDocumentos (1)
+End Sub
+
+
+
+Private Sub Worksheet_Activate()
+Dim lError As Long
+Dim Estatus As Long
+Dim DoctoDe As Long
+Dim EsCFD As Long
+Dim VerFacEle As Long
+Dim Esquema As String * 26
+Dim Codigo As String * 255
+Dim lIVAIncluido As Long
+Dim lLista() As String
+Dim lContadorIEPS As Integer
+Dim lCantidadTasasCuotasIEPS As Integer
+Dim lResultado As Long
+
+'Dim lCodigoConcepto As String * 61
+'Dim lCodigoServicio As String * 61
+Dim lCodigoConcepto As String
+Dim lCodigoServicio As String
+    
+    On Error GoTo Error_Worksheet_Activate
+    
+    DirectorioBase
+    If Worksheets("Parámetros").Range("UbicacionEmpresa").Value = "" Then
+        Worksheets("Parámetros").Activate
+        MsgBox "Seleccione la empresa a utilizar.", vbOKOnly
+    Else
+    
+        Worksheets("Parámetros").Unprotect
+        Worksheets("Parámetros").Range("C4").Value = Worksheets("Parámetros").Range("UbicacionEmpresa").Value
+        Worksheets("Parámetros").Protect
+        
+        Application.DisplayAlerts = False
+        
+        Range("FProceso").Value = "Preparando formato..."
+        'Public Const kTasasIVA = "16%,8%"
+        'Public Const kOpcionesIVA = "1=General,2=General/Exento,3=General/Tasa0%,4=General/Tasa0%/Exento"
+        gTasaIVA = 0.16
+        If Worksheets("Parámetros").Range("TasaIVA").Value = "8%" Then
+            gTasaIVA = 0.08
+        End If
+        Cells(kRenTitulos, kColIvaGeneral).Value = "Importe Base de IVA " + Worksheets("Parámetros").Range("TasaIVA").Value
+        Cells(kRenTitulos, kColIvaGeneral + 1).Value = "Descuento Base IVA " + Worksheets("Parámetros").Range("TasaIVA").Value
+        Cells(1, kColIvaTasa0).ColumnWidth = Cells(1, kColIvaGeneral).ColumnWidth
+        Cells(1, kColIvaExento).ColumnWidth = Cells(1, kColIvaGeneral).ColumnWidth
+        Cells(1, kColImpuestoLocal).ColumnWidth = Cells(1, kColIvaGeneral).ColumnWidth
+        lLista = Split(Worksheets("Parámetros").Range("IncluirTasaIVA").Value, "=")
+        gIncluirTasasIVA = CLng(lLista(0))
+        If gIncluirTasasIVA = 1 Then
+            Cells(1, kColIvaTasa0).ColumnWidth = 0
+            Cells(1, kColIvaExento).ColumnWidth = 0
+        End If
+        If gIncluirTasasIVA = 2 Then
+            Cells(1, kColIvaTasa0).ColumnWidth = 0
+        End If
+        If gIncluirTasasIVA = 3 Then
+            Cells(1, kColIvaExento).ColumnWidth = 0
+        End If
+        
+        If gNumeroImpRetLocal <> 0 Then
+            If Worksheets("Parámetros").Range("HabilitarImpRetLocal").Value = "Habilitar" Then
+                If Worksheets("Parámetros").Range("TasaImpRetLocal").Value = "" Then
+                    Cells(1, kColImpuestoLocal).ColumnWidth = 0
+                Else
+                    gTasaImpRetLocal = Worksheets("Parámetros").Range("TasaImpRetLocal").Value / 100
+                    Cells(kRenTitulos, kColImpuestoLocal).Value = "% " + Worksheets("Parámetros").Range("NombreImpRetLocal").Value
+                    Cells(kRenTitulos, kColImporteLocal).Value = Worksheets("Parámetros").Range("NombreImpRetLocal").Value
+                    
+                End If
+            Else
+                Cells(1, kColImpuestoLocal).ColumnWidth = 0
+            End If
+        Else
+            Cells(1, kColImpuestoLocal).ColumnWidth = 0
+        End If
+        
+        'Nombrar las celdas correspondientes al IEPS y desplegarlas
+        If gNumeroImpuestoIEPS <> 0 Then
+            lContadorIEPS = 0
+            If Worksheets("Parámetros").Range("HabilitarIEPS").Value = "Habilitar" Then
+                lCantidadTasasCuotasIEPS = CInt(Worksheets("Parámetros").Range("CantidadTasasCuotas").Value)
+                While lContadorIEPS < lCantidadTasasCuotasIEPS
+                    Cells(kRenTitulos, kColTasaCuotaIEPS1 + (lContadorIEPS * 2)).Value = Worksheets("Parámetros").Range("TasaOCuotaIEPS").Value + " " + CStr(lContadorIEPS + 1) + " " + Worksheets("Parámetros").Range("NombreIEPS").Value
+                    Cells(kRenTitulos, kColBaseIEPS1 + (lContadorIEPS * 2)).Value = "Base " + CStr(lContadorIEPS + 1) + " " + Worksheets("Parámetros").Range("NombreIEPS").Value
+                    Cells(1, kColTasaCuotaIEPS1 + (lContadorIEPS * 2)).ColumnWidth = Cells(1, kColIvaGeneral).ColumnWidth
+                    Cells(1, kColBaseIEPS1 + (lContadorIEPS * 2)).ColumnWidth = Cells(1, kColIvaGeneral).ColumnWidth
+                    lContadorIEPS = lContadorIEPS + 1
+                Wend
+                While lContadorIEPS < kMaximasTasasCuotasIEPS
+                    Cells(1, kColTasaCuotaIEPS1 + (lContadorIEPS * 2)).ColumnWidth = 0
+                    Cells(1, kColBaseIEPS1 + (lContadorIEPS * 2)).ColumnWidth = 0
+                    lContadorIEPS = lContadorIEPS + 1
+                Wend
+                Cells(kRenTitulos, kColImporteIEPS).Value = "Total " + Worksheets("Parámetros").Range("NombreIEPS").Value
+            Else
+                While lContadorIEPS < kMaximasTasasCuotasIEPS
+                    Cells(1, kColTasaCuotaIEPS1 + (lContadorIEPS * 2)).ColumnWidth = 0
+                    Cells(1, kColBaseIEPS1 + (lContadorIEPS * 2)).ColumnWidth = 0
+                    lContadorIEPS = lContadorIEPS + 1
+                Wend
+            End If
+        Else
+            Cells(1, kColTasaCuotaIEPS1).ColumnWidth = 0
+            Cells(1, kColBaseIEPS1).ColumnWidth = 0
+            Cells(1, kColTasaCuotaIEPS1 + 1).ColumnWidth = 0
+            Cells(1, kColBaseIEPS1 + 1).ColumnWidth = 0
+            Cells(1, kColTasaCuotaIEPS1 + 2).ColumnWidth = 0
+            Cells(1, kColBaseIEPS1 + 2).ColumnWidth = 0
+        End If
+        
+        If gNumeroSegundoImpuestoIEPS <> 0 Then
+            lContadorIEPS = 0
+            If Worksheets("Parámetros").Range("HabilitarSegundoIEPS").Value = "Habilitar" Then
+                lCantidadTasasCuotasIEPS = CInt(Worksheets("Parámetros").Range("CantidadTasasCuotasSegundoIEPS").Value)
+                While lContadorIEPS < lCantidadTasasCuotasIEPS
+                    Cells(kRenTitulos, kColTasaCuotaSegundoIEPS1 + (lContadorIEPS * 2)).Value = Worksheets("Parámetros").Range("TasaOCuotaSegundoIEPS").Value + " " + CStr(lContadorIEPS + 1) + " " + Worksheets("Parámetros").Range("NombreSegundoIEPS").Value
+                    Cells(kRenTitulos, kColBaseSegundoIEPS1 + (lContadorIEPS * 2)).Value = "Base " + CStr(lContadorIEPS + 1) + " " + Worksheets("Parámetros").Range("NombreSegundoIEPS").Value
+                    Cells(1, kColTasaCuotaSegundoIEPS1 + (lContadorIEPS * 2)).ColumnWidth = Cells(1, kColIvaGeneral).ColumnWidth
+                    Cells(1, kColBaseSegundoIEPS1 + (lContadorIEPS * 2)).ColumnWidth = Cells(1, kColIvaGeneral).ColumnWidth
+                    lContadorIEPS = lContadorIEPS + 1
+                Wend
+                While lContadorIEPS < kMaximasTasasCuotasIEPS
+                    Cells(1, kColTasaCuotaSegundoIEPS1 + (lContadorIEPS * 2)).ColumnWidth = 0
+                    Cells(1, kColBaseSegundoIEPS1 + (lContadorIEPS * 2)).ColumnWidth = 0
+                    lContadorIEPS = lContadorIEPS + 1
+                Wend
+                Cells(kRenTitulos, kColImporteSegundoIEPS).Value = "Total " + Worksheets("Parámetros").Range("NombreSegundoIEPS").Value
+            Else
+                While lContadorIEPS < kMaximasTasasCuotasIEPS
+                    Cells(1, kColTasaCuotaSegundoIEPS1 + (lContadorIEPS * 2)).ColumnWidth = 0
+                    Cells(1, kColBaseSegundoIEPS1 + (lContadorIEPS * 2)).ColumnWidth = 0
+                    lContadorIEPS = lContadorIEPS + 1
+                Wend
+            End If
+        Else
+            Cells(1, kColTasaCuotaSegundoIEPS1).ColumnWidth = 0
+            Cells(1, kColBaseSegundoIEPS1).ColumnWidth = 0
+            Cells(1, kColTasaCuotaSegundoIEPS1 + 1).ColumnWidth = 0
+            Cells(1, kColBaseSegundoIEPS1 + 1).ColumnWidth = 0
+            Cells(1, kColTasaCuotaSegundoIEPS1 + 2).ColumnWidth = 0
+            Cells(1, kColBaseSegundoIEPS1 + 2).ColumnWidth = 0
+        End If
+        
+        Cells(1, kColIvaTasa0 + 1).ColumnWidth = Cells(1, kColIvaTasa0).ColumnWidth
+        Cells(1, kColIvaExento + 1).ColumnWidth = Cells(1, kColIvaExento).ColumnWidth
+        Cells(1, kColImporteLocal).ColumnWidth = Cells(1, kColImpuestoLocal).ColumnWidth
+        Cells(1, kColImporteIEPS).ColumnWidth = Cells(1, kColTasaCuotaIEPS1).ColumnWidth
+        Cells(1, kColImporteSegundoIEPS).ColumnWidth = Cells(1, kColTasaCuotaSegundoIEPS1).ColumnWidth
+    
+        Range("FProceso").Value = "Preparando empresa..."
+        'hDbc = dbLogIn("Usuario MS Excel", Trim(Worksheets("Parámetros").Range("UbicacionEmpresa").Value))
+        Call comFacturaMain.dbLogIn("Usuario MS Excel", Trim(Worksheets("Parámetros").Range("UbicacionEmpresa").Value), hDbc)
+        'lError = fAbreEmpresa(Trim(Worksheets("Parámetros").Range("UbicacionEmpresa").Value))
+        Call comFacturaMain.AbreEmpresa(Trim(Worksheets("Parámetros").Range("UbicacionEmpresa").Value), lError)
+        If lError = 0 Then
+            'lError = fConfiguraEmpresaFacturaGlobal(lCodigoConcepto, lCodigoServicio)
+            Call comFacturaMain.ConfiguraEmpresaFacturaGlobal(lCodigoConcepto, lCodigoServicio, lError)
+        End If
+        If lError <> 0 Then
+           MsgBox MensajeError(lError), vbOKOnly
+        End If
+        'Call fCierraEmpresa
+        Call comFacturaMain.CierraEmpresa
+        If Range("FormaDePago") = "" Then
+            Range("FormaDePago").Value = "01=Efectivo"
+        End If
+        Range("CodigoConcepto").Value = Trim(fEliminaEspaciosNulos2(lCodigoConcepto))
+        Range("CodigoServicio").Value = Trim(fEliminaEspaciosNulos2(lCodigoServicio))
+        Range("FProceso").Value = ""
+        
+        Range("FFecha").Calculate
+    
+        'dbGetTopNoLock hDbc, PARAMETROS, IxPARAMETROS
+        'dbFieldNameLong hDbc, PARAMETROS, "cPrecios01", lIVAIncluido
+        Call comFacturaMain.dbGetTopNoLock(hDbc, PARAMETROS, IxPARAMETROS, lResultado)
+        Call comFacturaMain.dbFieldNameLong(hDbc, PARAMETROS, "cPrecios01", lIVAIncluido, lResultado)
+        Cells(kRenIVAIncluido, kColIVAIncluido).Value = lIVAIncluido
+        If lIVAIncluido = 0 Then
+            Cells(4, 5).Value = "Empresa configurada con Precios de venta sin IVA incluido"
+            Cells(7, 5).Value = "El precio unitario de cada ticket correspondera a la suma de las bases más el IVA"
+        Else
+            Cells(4, 5).Value = "Empresa configurada con Precios de venta con IVA incluido"
+            Cells(7, 5).Value = "El precio unitario de cada ticket correspondera a la suma de las bases"
+        End If
+        
+    End If
+    Exit Sub
+    
+Error_Worksheet_Activate:
+    Range("FProceso").Value = ""
+    MsgBox Err.Description, vbExclamation + vbOKOnly
+End Sub
+
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+Dim lTotal As Double
+Dim lTotalCascada As Double 'Este es el total cuando se realizan cálculos de impuestos en cascada y se tienen múltiples tasas o cuotas en una sola nota de venta
+Dim lIva As Double
+Dim lPrecio As Double
+Dim lImpRetLocal As Double
+Dim lIEPS As Double
+Dim lSegundoIEPS As Double
+Dim lIEPSTasaIVAGeneral As Double
+Dim lSegundoIEPSTasaIVAGeneral As Double
+Dim lBaseIEPS As Double
+Dim lCampoCalculoIEPS As String * 10
+Dim lFormulaIEPS As Long
+Dim lFormulaIVA As Long
+Dim lEsCalculoCascada As Boolean
+Dim lRenglon As Long
+Dim lTasaCuotaIEPSActual As Integer
+Dim lImpuesto As Long
+Dim lCampoImpRetLocal As String
+Dim lTasaImpRetCapturada As Boolean
+Dim lIvaGeneralNoCapturado As Boolean
+Dim lResultado As Long
+                
+    If Not Intersect(Target, Range("D22:K2022")) Is Nothing Or Not Intersect(Target, Range("M22:M2022")) Is Nothing Or Not Intersect(Target, Range("O22:O2022")) Is Nothing Or Not Intersect(Target, Range("Q22:Q2022")) Is Nothing Or Not Intersect(Target, Range("S22:S2022")) Is Nothing Or Not Intersect(Target, Range("U22:U2022")) Is Nothing Then
+        For lRenglon = Target.Row To (Target.Row + Target.Rows.Count - 1)
+            lTotal = 0#
+            lIva = 0#
+            lImpRetLocal = 0#
+            lPrecio = 0#
+            lTasaImpRetCapturada = False
+            lIvaGeneralNoCapturado = False
+            
+            If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                If Cells(kRenIVAIncluido, kColIVAIncluido).Value = 0 Then
+                    lPrecio = Cells(lRenglon, kColIvaGeneral).Value
+                    lIva = (Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIVA
+                    lTotal = (Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIVA)
+                Else
+                    lPrecio = (Cells(lRenglon, kColIvaGeneral).Value / (1 + gTasaIVA))
+                    lIva = ((Cells(lRenglon, kColIvaGeneral).Value / (1 + gTasaIVA)) - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIVA
+                    lTotal = (Cells(lRenglon, kColIvaGeneral).Value / (1 + gTasaIVA)) - Cells(lRenglon, kColIvaGeneral + 1).Value + lIva
+                End If
+            End If
+            If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                lTotal = lTotal + (Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value)
+                lPrecio = lPrecio + Cells(lRenglon, kColIvaTasa0).Value
+            End If
+            If CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 Then
+                lTotal = lTotal + (Cells(lRenglon, kColIvaExento).Value - Cells(lRenglon, kColIvaExento + 1).Value)
+                lPrecio = lPrecio + Cells(lRenglon, kColIvaExento).Value
+            End If
+            
+            If gNumeroImpRetLocal <> 0 Then
+                lCampoImpRetLocal = "cCfdImpu0" & gNumeroImpRetLocal
+                'dbGetTopNoLock hDbc, PARAMETROS, IxPARAMETROS
+                'dbFieldNameLong hDbc, PARAMETROS, lCampoImpRetLocal, lImpuesto
+                Call comFacturaMain.dbGetTopNoLock(hDbc, PARAMETROS, IxPARAMETROS, lResultado)
+                Call comFacturaMain.dbFieldNameLong(hDbc, PARAMETROS, lCampoImpRetLocal, lImpuesto, lResultado)
+                If Cells(lRenglon, kColImpuestoLocal).Value = "" Then
+                    If Not Worksheets("Parámetros").Range("TasaImpRetLocal").Value = "" Then
+                        If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                            Cells(lRenglon, kColImpuestoLocal).Value = Worksheets("Parámetros").Range("TasaImpRetLocal").Value
+                            lImpRetLocal = (Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaImpRetLocal
+                        End If
+                        If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                            Cells(lRenglon, kColImpuestoLocal).Value = Worksheets("Parámetros").Range("TasaImpRetLocal").Value
+                            lImpRetLocal = lImpRetLocal + ((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaImpRetLocal)
+                        End If
+                        If lImpuesto = 5 Then
+                            lTotal = lTotal - lImpRetLocal
+                        Else
+                            lTotal = lTotal + lImpRetLocal
+                        End If
+                    End If
+                Else
+                'kOpcionesIVA = "1=General,2=General/Exento,3=General/Tasa0%,4=General/Tasa0%/Exento"
+                    If gIncluirTasasIVA = 1 Or gIncluirTasasIVA = 2 Then
+                        If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                            lImpRetLocal = (Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaImpRetLocal
+                            If lImpuesto = 5 Then
+                                lTotal = lTotal - lImpRetLocal
+                            Else
+                                lTotal = lTotal + lImpRetLocal
+                            End If
+                        Else
+                            Cells(lRenglon, kColImpuestoLocal).Value = ""
+                        End If
+                    Else
+                        If gIncluirTasasIVA = 3 Or gIncluirTasasIVA = 4 Then
+                            If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                lImpRetLocal = (Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaImpRetLocal
+                            Else
+                                lIvaGeneralNoCapturado = True
+                            End If
+                            
+                            If CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                                lImpRetLocal = lImpRetLocal + ((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaImpRetLocal)
+                            Else
+                                If lIvaGeneralNoCapturado Then
+                                    Cells(lRenglon, kColImpuestoLocal).Value = ""
+                                End If
+                            End If
+                            If lImpuesto = 5 Then
+                                lTotal = lTotal - lImpRetLocal
+                            Else
+                                lTotal = lTotal + lImpRetLocal
+                            End If
+                        End If
+                    End If
+                End If
+            End If
+            
+            If gNumeroImpuestoIEPS <> 0 Then
+                lTasaCuotaIEPSActual = 0
+                lIEPS = 0
+                lIEPSTasaIVAGeneral = 0
+                lEsCalculoCascada = False
+                lTotalCascada = lTotal
+                If CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 Then
+                    lTotalCascada = lTotalCascada - (Cells(lRenglon, kColIvaExento).Value - Cells(lRenglon, kColIvaExento + 1).Value)
+                End If
+                While lTasaCuotaIEPSActual < CInt(Worksheets("Parámetros").Range("CantidadTasasCuotas").Value)
+                    If CDbl(Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value) <> 0 Then
+                        If (Not CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0) And (Not CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0) And CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 Then
+                            Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value = ""
+                            Cells(lRenglon, kColBaseIEPS1 + (lTasaCuotaIEPSActual * 2)).Value = ""
+                        Else
+                            If Worksheets("Parámetros").Range("TasaOCuotaIEPS").Value = "Tasa" Then
+                                gTasaIEPS = CDbl(Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value) / 100
+                                'If dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value) = 0 Then
+                                Call comFacturaMain.dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value, lResultado)
+                                If lResultado = 0 Then
+                                    If gNumeroImpuestoIEPS = 1 Then
+                                       lCampoCalculoIEPS = "cIdFormu05"
+                                    Else
+                                        If gNumeroImpuestoIEPS = 2 Then
+                                            lCampoCalculoIEPS = "cIdFormu07"
+                                        End If
+                                    End If
+                                    'dbFieldNameLong hDbc, CONCEPTOS, lCampoCalculoIEPS, lFormulaIEPS
+                                    Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lCampoCalculoIEPS, lFormulaIEPS, lResultado)
+                                    If gNumeroImpuestoIEPS = 1 Or lFormulaIEPS = 61 Or lFormulaIEPS = 51 Or lFormulaIEPS = 64 Then
+                                        If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 And CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                                            lIEPSTasaIVAGeneral = lIEPSTasaIVAGeneral + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIEPS)
+                                            lIEPS = lIEPS + ((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaIEPS)
+                                            lBaseIEPS = Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value + Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value
+                                        Else
+                                            If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                                lIEPSTasaIVAGeneral = lIEPSTasaIVAGeneral + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIEPS)
+                                                'lIEPS = lIEPS + lIEPSTasaIVAGeneral
+                                                lBaseIEPS = Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value
+                                            Else
+                                                lIEPS = lIEPS + ((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaIEPS)
+                                                lBaseIEPS = Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value
+                                            End If
+                                        End If
+                                    Else
+                                        lEsCalculoCascada = True
+                                        lIEPS = lIEPS + (lTotalCascada * gTasaIEPS)
+                                        lBaseIEPS = lTotalCascada
+                                        lIEPSTasaIVAGeneral = lIEPS
+                                    End If
+                                End If
+                            Else
+                                lBaseIEPS = 1
+                                If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                    lIEPSTasaIVAGeneral = lIEPSTasaIVAGeneral + CDbl(Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value)
+                                Else
+                                    lIEPS = lIEPS + CDbl(Cells(lRenglon, kColTasaCuotaIEPS1 + (lTasaCuotaIEPSActual * 2)).Value)
+                                End If
+                            End If
+                            'Cells(lRenglon, kColTotal + 3).Value = lIEPS
+                            If Not Cells(lRenglon, kColBaseIEPS1 + (lTasaCuotaIEPSActual * 2)).Value <> 0 Then
+                                Cells(lRenglon, kColBaseIEPS1 + (lTasaCuotaIEPSActual * 2)).Value = lBaseIEPS
+                            End If
+                        End If
+                    End If
+                    lTasaCuotaIEPSActual = lTasaCuotaIEPSActual + 1
+                Wend
+                
+                'If dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value) = 0 Then
+                Call comFacturaMain.dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value, lResultado)
+                If lResultado = 0 Then
+                    'dbFieldNameLong hDbc, CONCEPTOS, "cIdFormu07", lFormulaIVA
+                    If gNumeroImpuestoIVA = 2 Then
+                        Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cIdFormu07", lFormulaIVA, lResultado)
+                    Else
+                        Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cIdFormu09", lFormulaIVA, lResultado)
+                    End If
+                    If (gNumeroImpuestoIVA = 2 And lFormulaIVA = 63) Or (gNumeroImpuestoIVA = 3 And lFormulaIVA = 73) Then
+                        lTotal = lTotal - ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIVA)
+                        lIva = Round((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value + lIEPSTasaIVAGeneral) * gTasaIVA, 2)
+                        lTotal = lTotal + lIva
+                    End If
+                End If
+                'Carlos inicio
+                If lEsCalculoCascada = False Then
+                    lIEPS = lIEPS + lIEPSTasaIVAGeneral
+                End If
+                'Carlos fin
+                'lIEPS = lIEPS + lIEPSTasaIVAGeneral
+                Cells(lRenglon, kColTotal + 3).Value = lIEPS
+                lTotal = lTotal + lIEPS
+            End If
+            
+            If gNumeroSegundoImpuestoIEPS <> 0 Then
+                lTasaCuotaIEPSActual = 0
+                lSegundoIEPS = 0
+                lSegundoIEPSTasaIVAGeneral = 0
+                lEsCalculoCascada = False
+                If gNumeroImpuestoIVA = 3 Then
+                    lTotalCascada = lTotal - lIva
+                Else
+                    lTotalCascada = lTotal
+                End If
+                If CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 Then
+                    lTotalCascada = lTotalCascada - (Cells(lRenglon, kColIvaExento).Value - Cells(lRenglon, kColIvaExento + 1).Value)
+                End If
+                While lTasaCuotaIEPSActual < CInt(Worksheets("Parámetros").Range("CantidadTasasCuotasSegundoIEPS").Value)
+                    If CDbl(Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value) <> 0 Then
+                        If (Not CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0) And (Not CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0) And CDbl(Cells(lRenglon, kColIvaExento).Value) <> 0 Then
+                            Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value = ""
+                            Cells(lRenglon, kColBaseSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value = ""
+                        Else
+                            If Worksheets("Parámetros").Range("TasaOCuotaSegundoIEPS").Value = "Tasa" Then
+                                gTasaSegundoIEPS = CDbl(Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value) / 100
+                                'If dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value) = 0 Then
+                                Call comFacturaMain.dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value, lResultado)
+                                If lResultado = 0 Then
+                                    If gNumeroSegundoImpuestoIEPS = 2 Then
+                                       lCampoCalculoIEPS = "cIdFormu07"
+                                    Else
+                                        If gNumeroSegundoImpuestoIEPS = 3 Then
+                                            lCampoCalculoIEPS = "cIdFormu09"
+                                        End If
+                                    End If
+                                    'dbFieldNameLong hDbc, CONCEPTOS, lCampoCalculoIEPS, lFormulaIEPS
+                                    Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, lCampoCalculoIEPS, lFormulaIEPS, lResultado)
+                                    If lFormulaIEPS = 61 Or lFormulaIEPS = 64 Or lFormulaIEPS = 71 Then
+                                        If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 And CDbl(Cells(lRenglon, kColIvaTasa0).Value) <> 0 Then
+                                            lSegundoIEPSTasaIVAGeneral = lSegundoIEPSTasaIVAGeneral + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaSegundoIEPS)
+                                            lSegundoIEPS = lSegundoIEPS + ((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaSegundoIEPS)
+                                            lBaseIEPS = Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value + Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value
+                                        Else
+                                            If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                                lSegundoIEPSTasaIVAGeneral = lSegundoIEPSTasaIVAGeneral + ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaSegundoIEPS)
+                                                'lIEPS = lIEPS + lIEPSTasaIVAGeneral
+                                                lBaseIEPS = Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value
+                                            Else
+                                                lSegundoIEPS = lSegundoIEPS + ((Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value) * gTasaSegundoIEPS)
+                                                lBaseIEPS = Cells(lRenglon, kColIvaTasa0).Value - Cells(lRenglon, kColIvaTasa0 + 1).Value
+                                            End If
+                                        End If
+                                    Else
+                                        lEsCalculoCascada = True
+                                        lSegundoIEPS = lSegundoIEPS + (lTotalCascada * gTasaSegundoIEPS)
+                                        lBaseIEPS = lTotalCascada
+                                        lSegundoIEPSTasaIVAGeneral = lSegundoIEPS
+                                    End If
+                                End If
+                            Else
+                                lBaseIEPS = 1
+                                If CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                                    lSegundoIEPSTasaIVAGeneral = lSegundoIEPSTasaIVAGeneral + CDbl(Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value)
+                                Else
+                                    lSegundoIEPS = lSegundoIEPS + CDbl(Cells(lRenglon, kColTasaCuotaSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value)
+                                End If
+                            End If
+                            'Cells(lRenglon, kColTotal + 3).Value = lIEPS
+                            If Not Cells(lRenglon, kColBaseSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value <> 0 Then
+                                Cells(lRenglon, kColBaseSegundoIEPS1 + (lTasaCuotaIEPSActual * 2)).Value = lBaseIEPS
+                            End If
+                        End If
+                    End If
+                    lTasaCuotaIEPSActual = lTasaCuotaIEPSActual + 1
+                Wend
+                
+                'If dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value) = 0 Then
+                Call comFacturaMain.dbGetNoLock(hDbc, CONCEPTOS, IxCCODIGOC01, Range("CodigoConcepto").Value, lResultado)
+                If lResultado = 0 Then
+                    'dbFieldNameLong hDbc, CONCEPTOS, "cIdFormu07", lFormulaIVA
+                    Call comFacturaMain.dbFieldNameLong(hDbc, CONCEPTOS, "cIdFormu09", lFormulaIVA, lResultado)
+                    If gNumeroImpuestoIVA = 3 And lFormulaIVA = 73 And CDbl(Cells(lRenglon, kColIvaGeneral).Value) <> 0 Then
+                        'lTotal = lTotal - ((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value) * gTasaIVA)
+                        lTotal = lTotal - lIva
+                        lIva = Round((Cells(lRenglon, kColIvaGeneral).Value - Cells(lRenglon, kColIvaGeneral + 1).Value + lIEPSTasaIVAGeneral + lSegundoIEPSTasaIVAGeneral) * gTasaIVA, 2)
+                        lTotal = lTotal + lIva
+                    End If
+                End If
+                If lEsCalculoCascada = False Then
+                    lSegundoIEPS = lSegundoIEPS + lSegundoIEPSTasaIVAGeneral
+                End If
+                'lSegundoIEPS = lSegundoIEPS + lSegundoIEPSTasaIVAGeneral
+                Cells(lRenglon, kColTotal + 4).Value = lSegundoIEPS
+                lTotal = lTotal + lSegundoIEPS
+            End If
+            
+            Cells(lRenglon, kColTotal + 5).Value = ""
+            If lTotal <= 0 Then
+                Cells(lRenglon, kColTotal + 5).Value = "El importe del movimiento no puede ser cero o negativo (" & lTotal & ")"
+                lTotal = 0
+                lIva = 0
+            End If
+            Cells(lRenglon, kColTotal).Value = lTotal
+            Cells(lRenglon, kColTotal + 1).Value = lIva
+            Cells(lRenglon, kColTotal + 2).Value = lImpRetLocal
+            Cells(lRenglon, kColTotal + 5).Value = lPrecio
+            Cells(lRenglon, kColTotal).NumberFormat = "0.00"
+            Cells(lRenglon, kColTotal + 1).NumberFormat = "0.00"
+            Cells(lRenglon, kColTotal + 2).NumberFormat = "0.00"
+            Cells(lRenglon, kColTotal + 3).NumberFormat = "0.00"
+            Cells(lRenglon, kColTotal + 4).NumberFormat = "0.00"
+            Cells(lRenglon, kColTotal + 5).NumberFormat = "0.00"
+        Next
+    End If
+End Sub
+
+Public Sub DesplegarCatalogoF3()
+    If ActiveSheet.Name <> "Factura" Then
+        GoTo fin
+    End If
+    ' se establece con cual función se trabaja
+    On Error GoTo hdlerr
+    
+    If Not Intersect(ActiveCell, ActiveSheet.Range("CodigoConcepto")) Is Nothing Then
+        Call FbtnConcepto_Click
+        GoTo fin
+    End If
+    If Not Intersect(ActiveCell, ActiveSheet.Range("CodigoCliente")) Is Nothing Then
+        Call FbtnCliente_Click
+        GoTo fin
+    End If
+    If Not Intersect(ActiveCell, ActiveSheet.Range("CodigoServicio")) Is Nothing Then
+        Call FbtnServicio_Click
+        GoTo fin
+    End If
+    If Not Intersect(ActiveCell, ActiveSheet.Range("FormaDePago")) Is Nothing Then
+        Call FbtnFormaPago_Click
+        GoTo fin
+    End If
+    GoTo fin
+hdlerr:
+    MsgBox Err.Description
+fin:
+End Sub

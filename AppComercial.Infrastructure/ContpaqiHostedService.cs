@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace AppComercial.Infrastructure;
 
-public class ContpaqiHostedService : IHostedService
+public class ContpaqiHostedService : BackgroundService
 {
     private readonly IContpaqiSdk _sdk;
     private readonly ILogger<ContpaqiHostedService> _logger;
@@ -19,28 +19,36 @@ public class ContpaqiHostedService : IHostedService
         _config = config;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Forzamos a que el método ceda el control inmediato a ASP.NET Core
+        // Así Kestrel puede iniciar y escuchar los puertos, aunque el SDK tarde en inicializar
+        await Task.Yield();
+
         _logger.LogInformation("Inicializando SDK de CONTPAQi...");
         try
         {
-            var rutaEmpresa    = _config["Contpaqi:DirectorioEmpresa"] ?? @"C:\Compac\Empresas\adEMPRESA_DE_PRUEBA";
-            var usuarioGlobal  = _config["Contpaqi:Usuario"] ?? "SUPERVISOR";
-            var passwordGlobal = _config["Contpaqi:Contrasena"] ?? "";
+            // Ejecutar en hilo de ThreadPool para no bloquear hilo principal si hay un colgado nativo
+            await Task.Run(async () => 
+            {
+                var rutaEmpresa    = _config["Contpaqi:DirectorioEmpresa"] ?? @"C:\Compac\Empresas\adEMPRESA_DE_PRUEBA";
+                var usuarioGlobal  = _config["Contpaqi:Usuario"] ?? "SUPERVISOR";
+                var passwordGlobal = _config["Contpaqi:Contrasena"] ?? "";
 
-            // Leer el sistema seleccionado. Valores aceptados: "Comercial" | "FacturaElectronica"
-            var sistemaStr = _config["Contpaqi:Sistema"] ?? "Comercial";
-            var sistema = Enum.TryParse<SistemaContpaqi>(sistemaStr, ignoreCase: true, out var parsed)
-                ? parsed
-                : SistemaContpaqi.Comercial;
+                // Leer el sistema seleccionado. Valores aceptados: "Comercial" | "FacturaElectronica"
+                var sistemaStr = _config["Contpaqi:Sistema"] ?? "Comercial";
+                var sistema = Enum.TryParse<SistemaContpaqi>(sistemaStr, ignoreCase: true, out var parsed)
+                    ? parsed
+                    : SistemaContpaqi.Comercial;
 
-            _logger.LogInformation("Sistema seleccionado: {Sistema}", sistema);
+                _logger.LogInformation("Sistema seleccionado: {Sistema}", sistema);
 
-            await _sdk.IniciarSesionAsync(usuarioGlobal, passwordGlobal, sistema);
-            _logger.LogInformation("Sesión iniciada con usuario: {Usuario}", usuarioGlobal);
+                await _sdk.IniciarSesionAsync(usuarioGlobal, passwordGlobal, sistema);
+                _logger.LogInformation("Sesión iniciada con usuario: {Usuario}", usuarioGlobal);
 
-            await _sdk.AbrirEmpresaAsync(rutaEmpresa);
-            _logger.LogInformation("Empresa abierta: {Directorio}", rutaEmpresa);
+                await _sdk.AbrirEmpresaAsync(rutaEmpresa);
+                _logger.LogInformation("Empresa abierta: {Directorio}", rutaEmpresa);
+            }, stoppingToken);
         }
         catch (Exception ex)
         {
@@ -48,7 +56,7 @@ public class ContpaqiHostedService : IHostedService
         }
     }
 
-    public async Task StopAsync(CancellationToken cancellationToken)
+    public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Cerrando empresa en el SDK...");
         try
@@ -68,5 +76,7 @@ public class ContpaqiHostedService : IHostedService
         {
             _logger.LogError(ex, "Ocurrió un error al cerrar la empresa en el SDK.");
         }
+        
+        await base.StopAsync(cancellationToken);
     }
 }

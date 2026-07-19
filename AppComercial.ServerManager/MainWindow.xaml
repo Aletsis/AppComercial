@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
-        Title="CONTPAQi REST API Manager" Height="500" Width="700"
+        Title="CONTPAQi REST API Manager" Height="720" Width="980"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         TextElement.FontWeight="Regular"
         TextElement.FontSize="13"
@@ -13,94 +13,709 @@
         TextOptions.TextRenderingMode="Auto"
         Background="{DynamicResource MaterialDesignPaper}"
         FontFamily="{DynamicResource MaterialDesignFont}"
-        WindowStartupLocation="CenterScreen">
-    
+        WindowStartupLocation="CenterScreen"
+        MinHeight="620" MinWidth="840">
+
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="250" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="235"/>
+            <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <!-- Sidebar -->
-        <Border Background="{DynamicResource MaterialDesignDarkBackground}" Grid.Column="0">
-            <StackPanel Margin="20">
-                <TextBlock Text="API SERVER" Foreground="White" FontSize="24" FontWeight="Bold" Margin="0,0,0,30" HorizontalAlignment="Center"/>
-                
-                <materialDesign:PackIcon Kind="ServerNetwork" Width="80" Height="80" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+        <!-- ═══════════════════════════════════════ -->
+        <!--                SIDEBAR                  -->
+        <!-- ═══════════════════════════════════════ -->
+        <Border Grid.Column="0" Background="#120E1E">
+            <DockPanel>
 
-                <TextBlock x:Name="TxtStatus" Text="DETENIDO" Foreground="Tomato" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,30"/>
+                <!-- Version info at bottom -->
+                <Border DockPanel.Dock="Bottom" Padding="10,10" Opacity="0.4">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtApiVersion" Text="API v—" FontSize="10"
+                                   Foreground="White" HorizontalAlignment="Center"/>
+                        <TextBlock Text="ServerManager v2.0" FontSize="10"
+                                   Foreground="White" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
 
-                <Button x:Name="BtnStart" Content="INICIAR API" Height="45" Margin="0,0,0,15" Background="LimeGreen" BorderBrush="LimeGreen" Foreground="White" Click="BtnStart_Click"/>
-                <Button x:Name="BtnStop" Content="DETENER API" Height="45" IsEnabled="False" Margin="0,0,0,15" Background="Tomato" BorderBrush="Tomato" Foreground="White" Click="BtnStop_Click"/>
-            </StackPanel>
+                <!-- Main sidebar -->
+                <StackPanel Margin="18,24,18,10">
+
+                    <!-- Logo badge -->
+                    <Border Background="#2D1E50" CornerRadius="16" Padding="16"
+                            Margin="20,0,20,14" HorizontalAlignment="Center">
+                        <materialDesign:PackIcon Kind="ServerNetwork" Width="44" Height="44"
+                                                 Foreground="#CE93D8"/>
+                    </Border>
+
+                    <TextBlock Text="API SERVER" Foreground="White" FontSize="19" FontWeight="Bold"
+                               HorizontalAlignment="Center" Margin="0,0,0,2"/>
+                    <TextBlock Text="CONTPAQi Comercial" Foreground="#9575CD" FontSize="11"
+                               HorizontalAlignment="Center" Margin="0,0,0,18"/>
+
+                    <!-- Status badge -->
+                    <Border Background="#1E1535" CornerRadius="20" Padding="14,9" Margin="0,0,0,6">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Ellipse x:Name="StatusDot" Width="10" Height="10"
+                                     Fill="#F44336" VerticalAlignment="Center" Margin="0,0,9,0"/>
+                            <TextBlock x:Name="TxtStatus" Text="DETENIDO" Foreground="#F44336"
+                                       FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Uptime -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,2">
+                        <materialDesign:PackIcon Kind="Timer" Width="13" Height="13"
+                                                 Foreground="#5C5C7E" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBlock x:Name="TxtUptime" Text="--:--:--" Foreground="#5C5C7E" FontSize="12"/>
+                    </StackPanel>
+
+                    <!-- PID -->
+                    <TextBlock x:Name="TxtPid" Text="" Foreground="#3E3E5E" FontSize="11"
+                               HorizontalAlignment="Center" Margin="0,1,0,18"/>
+
+                    <!-- === Buttons === -->
+                    <Button x:Name="BtnStart" Height="40" Margin="0,0,0,8"
+                            Background="#2E7D32" BorderBrush="#2E7D32" Foreground="White"
+                            Click="BtnStart_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Play" Width="15" Height="15"
+                                                     VerticalAlignment="Center" Margin="0,0,7,0"/>
+                            <TextBlock Text="INICIAR API" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button x:Name="BtnStop" Height="40" IsEnabled="False" Margin="0,0,0,8"
+                            Background="#C62828" BorderBrush="#C62828" Foreground="White"
+                            Click="BtnStop_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Stop" Width="15" Height="15"
+                                                     VerticalAlignment="Center" Margin="0,0,7,0"/>
+                            <TextBlock Text="DETENER API" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button x:Name="BtnRestart" Height="40" IsEnabled="False" Margin="0,0,0,20"
+                            Background="#BF360C" BorderBrush="#BF360C" Foreground="White"
+                            Click="BtnRestart_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Refresh" Width="15" Height="15"
+                                                     VerticalAlignment="Center" Margin="0,0,7,0"/>
+                            <TextBlock Text="REINICIAR API" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Separator Background="#2D1E50" Margin="0,0,0,16"/>
+
+                    <!-- Swagger shortcut -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                Cursor="Hand" MouseLeftButtonDown="SidebarSwaggerLink_Click">
+                        <materialDesign:PackIcon Kind="OpenInBrowser" Width="13" Height="13"
+                                                 Foreground="#7E57C2" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBlock Text="Abrir Swagger UI" Foreground="#7E57C2" FontSize="11"
+                                   TextDecorations="Underline" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </DockPanel>
         </Border>
 
-        <!-- Main Content (Tabs) -->
+        <!-- ═══════════════════════════════════════ -->
+        <!--            MAIN CONTENT (TABS)          -->
+        <!-- ═══════════════════════════════════════ -->
         <TabControl Grid.Column="1" Background="Transparent" BorderThickness="0">
-            <!-- Pestaña Log -->
-            <TabItem Header="Consola de Servidor">
-                <Grid Margin="10">
+
+            <!-- ══════════════════════════════════ -->
+            <!--   TAB 1 — CONSOLA DE SERVIDOR      -->
+            <!-- ══════════════════════════════════ -->
+            <TabItem Header="  Consola  ">
+                <Grid Margin="15">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Toolbar -->
+                    <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                            <materialDesign:PackIcon Kind="Console" Width="18" Height="18"
+                                                     Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                            <TextBlock Text="Consola de Servidor" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="BtnClearLog" Height="32" Padding="12,0" Margin="0,0,8,0"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    Click="BtnClearLog_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="DeleteSweep" Width="14" Height="14"
+                                                             VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Limpiar" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="BtnOpenLog" Height="32" Padding="12,0"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    Click="BtnOpenLog_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="FileDocument" Width="14" Height="14"
+                                                             VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock Text="Ver Log" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- Log console -->
+                    <Border Grid.Row="1" BorderBrush="#2A2A3A" BorderThickness="1"
+                            Background="#080C12" CornerRadius="6">
+                        <ScrollViewer x:Name="LogScroll" VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="TxtLog" Foreground="#3DDC84" FontFamily="Consolas"
+                                       FontSize="12" Margin="12" TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- Active URL bar -->
+                    <Border Grid.Row="2" Background="#1A1228" CornerRadius="6"
+                            Padding="12,8" Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="LinkVariant" Width="14" Height="14"
+                                                     Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                            <TextBlock Text="URL activa: " Foreground="#5C5C7E" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtUrlDisplay" Text="—" Foreground="#CE93D8" FontSize="12"
+                                       VerticalAlignment="Center" Cursor="Hand" TextDecorations="Underline"
+                                       MouseLeftButtonDown="TxtUrlDisplay_Click"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ══════════════════════════════════ -->
+            <!--   TAB 2 — CONFIGURACIÓN            -->
+            <!-- ══════════════════════════════════ -->
+            <TabItem Header="  Configuración  ">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20,18">
+
+                        <!-- Header -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                            <materialDesign:PackIcon Kind="Cog" Width="22" Height="22"
+                                                     Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Configuración de la API" FontSize="17"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- ── Card: URL de Escucha ── -->
+                        <materialDesign:Card Padding="16" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                    <materialDesign:PackIcon Kind="Web" Width="16" Height="16"
+                                                             Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="URL de Escucha" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBox x:Name="TxtUrl" Text="http://*:5271"
+                                         materialDesign:HintAssist.Hint="Ej: http://*:5271 (externo) o http://localhost:5271 (solo local)"
+                                         Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                                <TextBlock FontSize="11" Opacity="0.55" TextWrapping="Wrap" Margin="0,6,0,0"
+                                           Text="Usa http://*:5271 para aceptar conexiones desde otros equipos en la red local."/>
+                            </StackPanel>
+                        </materialDesign:Card>
+
+                        <!-- ── Card: Parámetros CONTPAQi ── -->
+                        <materialDesign:Card Padding="16" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                    <materialDesign:PackIcon Kind="Domain" Width="16" Height="16"
+                                                             Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="Parámetros CONTPAQi" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <ComboBox x:Name="CmbSistema" Margin="0,0,0,14"
+                                          materialDesign:HintAssist.Hint="Sistema CONTPAQi"
+                                          Style="{StaticResource MaterialDesignOutlinedComboBox}">
+                                    <ComboBoxItem Content="CONTPAQi Comercial Premium" Tag="Comercial" IsSelected="True"/>
+                                    <ComboBoxItem Content="CONTPAQi Factura Electrónica" Tag="FacturaElectronica"/>
+                                </ComboBox>
+
+                                <!-- Directorio empresa -->
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtDirectorioEmpresa" Grid.Column="0"
+                                             materialDesign:HintAssist.Hint="Directorio de empresa (Ej: C:\Compac\Empresas\adEMPRESA)"
+                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                                    <Button x:Name="BtnBrowseEmpresa" Grid.Column="2" Width="42" Height="42"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                                            Click="BtnBrowseEmpresa_Click" Padding="6"
+                                            ToolTip="Seleccionar carpeta de empresa">
+                                        <materialDesign:PackIcon Kind="FolderOpen" Width="20" Height="20"/>
+                                    </Button>
+                                </Grid>
+
+                                <!-- Usuario + Contraseña CONTPAQi -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtUsuario" Grid.Column="0" Text="SUPERVISOR"
+                                             materialDesign:HintAssist.Hint="Usuario CONTPAQi (Ej: SUPERVISOR)"
+                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                                    <!-- Password with show/hide overlay -->
+                                    <Grid Grid.Column="2">
+                                        <PasswordBox x:Name="TxtPassword"
+                                                     materialDesign:HintAssist.Hint="Contraseña CONTPAQi (vacío si no tiene)"
+                                                     Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
+                                        <TextBox x:Name="TxtPasswordVisible" Visibility="Collapsed"
+                                                 materialDesign:HintAssist.Hint="Contraseña CONTPAQi"
+                                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                                        <Button x:Name="BtnShowContpaqiPass" Width="30" Height="30"
+                                                HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                Style="{StaticResource MaterialDesignIconButton}"
+                                                Click="BtnShowContpaqiPass_Click" Padding="4"
+                                                ToolTip="Mostrar/Ocultar contraseña">
+                                            <materialDesign:PackIcon x:Name="IconShowContpaqiPass" Kind="Eye" Width="16" Height="16"/>
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+
+                                <!-- Contraseña del CSD -->
+                                <Grid Margin="0,14,0,0">
+                                    <PasswordBox x:Name="TxtCsdPassword"
+                                                 materialDesign:HintAssist.Hint="Contraseña del CSD (para timbrado automático)"
+                                                 Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
+                                    <TextBox x:Name="TxtCsdPasswordVisible" Visibility="Collapsed"
+                                             materialDesign:HintAssist.Hint="Contraseña del CSD (para timbrado automático)"
+                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                                    <Button x:Name="BtnShowCsdPassword" Width="30" Height="30"
+                                            HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"
+                                            Style="{StaticResource MaterialDesignIconButton}"
+                                            Click="BtnShowCsdPassword_Click" Padding="4"
+                                            ToolTip="Mostrar/Ocultar contraseña del CSD">
+                                        <materialDesign:PackIcon x:Name="IconShowCsdPassword" Kind="Eye" Width="16" Height="16"/>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </materialDesign:Card>
+
+                        <!-- ── Card: SQL Server ── -->
+                        <materialDesign:Card Padding="16" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <materialDesign:PackIcon Kind="Database" Width="16" Height="16"
+                                                             Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="Conexión SQL Server" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TxtSqlTestResult" FontSize="12" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                                </StackPanel>
+                                <TextBlock FontSize="11" Opacity="0.55" TextWrapping="Wrap" Margin="0,2,0,14"
+                                           Text="Genera las cadenas de conexión: ContpaqiComercial, CompacWAdmin y RepositorioAdminPAQ."/>
+
+                                <!-- Servidor + BD -->
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtSqlServer" Grid.Column="0"
+                                             materialDesign:HintAssist.Hint="Servidor SQL (Ej: localhost\COMPAC2019)"
+                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                                    <TextBox x:Name="TxtSqlDb" Grid.Column="2"
+                                             materialDesign:HintAssist.Hint="Base de datos empresa (Ej: adNEWMEGI2020)"
+                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                                </Grid>
+
+                                <!-- Usuario SQL + Contraseña SQL -->
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtSqlUser" Grid.Column="0"
+                                             materialDesign:HintAssist.Hint="Usuario SQL (Ej: sa)"
+                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                                    <Grid Grid.Column="2">
+                                        <PasswordBox x:Name="TxtSqlPass"
+                                                     materialDesign:HintAssist.Hint="Contraseña SQL"
+                                                     Style="{StaticResource MaterialDesignOutlinedPasswordBox}"/>
+                                        <TextBox x:Name="TxtSqlPassVisible" Visibility="Collapsed"
+                                                 materialDesign:HintAssist.Hint="Contraseña SQL"
+                                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"/>
+                                        <Button x:Name="BtnShowSqlPass" Width="30" Height="30"
+                                                HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                Style="{StaticResource MaterialDesignIconButton}"
+                                                Click="BtnShowSqlPass_Click" Padding="4"
+                                                ToolTip="Mostrar/Ocultar contraseña SQL">
+                                            <materialDesign:PackIcon x:Name="IconShowSqlPass" Kind="Eye" Width="16" Height="16"/>
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+
+                                <Button x:Name="BtnTestSql" Height="34" Padding="14,0" HorizontalAlignment="Left"
+                                        Style="{StaticResource MaterialDesignOutlinedButton}"
+                                        Click="BtnTestSql_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="DatabaseSearch" Width="15" Height="15"
+                                                                 VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Probar Conexión SQL" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </materialDesign:Card>
+
+                        <!-- Action buttons -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button x:Name="BtnBackupConfig" Height="38" Padding="16,0" Margin="0,0,10,0"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}"
+                                    Click="BtnBackupConfig_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="ContentSave" Width="15" Height="15"
+                                                             VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Exportar Config" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Content="GUARDAR CONFIGURACIÓN" Height="38" Padding="18,0"
+                                    Click="BtnSaveConfig_Click"/>
+                        </StackPanel>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ══════════════════════════════════ -->
+            <!--   TAB 3 — ESTADO DEL SISTEMA       -->
+            <!-- ══════════════════════════════════ -->
+            <TabItem Header="  Estado  ">
+                <Grid Margin="15">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    
-                    <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,10">
-                        <TextBlock Text="Url de Escucha: " FontWeight="Bold" VerticalAlignment="Center"/>
-                        <TextBox x:Name="TxtUrl" Text="http://localhost:5271" Width="200" Margin="10,0,0,0" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    
-                    <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Background="#1E1E1E" CornerRadius="4">
-                        <ScrollViewer x:Name="LogScroll" VerticalScrollBarVisibility="Auto">
-                            <TextBlock x:Name="TxtLog" Foreground="LightGreen" FontFamily="Consolas" FontSize="12" Margin="10" TextWrapping="Wrap"/>
-                        </ScrollViewer>
-                    </Border>
+
+                    <!-- Toolbar -->
+                    <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Monitor" Width="22" Height="22"
+                                                     Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Diagnóstico del Sistema" FontSize="17"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button DockPanel.Dock="Right" x:Name="BtnRefreshStatus" Height="32" Padding="12,0"
+                                HorizontalAlignment="Right"
+                                Style="{StaticResource MaterialDesignOutlinedButton}"
+                                Click="BtnRefreshStatus_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Refresh" Width="14" Height="14"
+                                                         VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                <TextBlock Text="Actualizar" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </DockPanel>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+
+                            <!-- Row 1: Process + HTTP -->
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Process Card -->
+                                <materialDesign:Card Grid.Column="0" Padding="16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <materialDesign:PackIcon Kind="Memory" Width="16" Height="16"
+                                                                     Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                            <TextBlock Text="Proceso API" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Estado:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagProcessStatus" Grid.Column="1" Text="—" FontWeight="SemiBold" FontSize="12"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="PID:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagPid" Grid.Column="1" Text="—" FontSize="12"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Uptime:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagUptime" Grid.Column="1" Text="—" FontSize="12"/>
+                                        </Grid>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="RAM:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagRam" Grid.Column="1" Text="—" FontSize="12"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </materialDesign:Card>
+
+                                <!-- HTTP Card -->
+                                <materialDesign:Card Grid.Column="2" Padding="16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <materialDesign:PackIcon Kind="Web" Width="16" Height="16"
+                                                                     Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                            <TextBlock Text="Conectividad HTTP" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="URL:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagUrl" Grid.Column="1" Text="—" FontSize="12" TextWrapping="Wrap"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Swagger:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagHttp" Grid.Column="1" Text="—" FontWeight="SemiBold" FontSize="12"/>
+                                        </Grid>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Latencia:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagLatency" Grid.Column="1" Text="—" FontSize="12"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </materialDesign:Card>
+                            </Grid>
+
+                            <!-- Row 2: SQL + SDK -->
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- SQL Card -->
+                                <materialDesign:Card Grid.Column="0" Padding="16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <materialDesign:PackIcon Kind="Database" Width="16" Height="16"
+                                                                     Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                            <TextBlock Text="SQL Server" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Estado:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagSqlStatus" Grid.Column="1" Text="—" FontWeight="SemiBold" FontSize="12"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Servidor:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagSqlServerLabel" Grid.Column="1" Text="—" FontSize="12" TextWrapping="Wrap"/>
+                                        </Grid>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="BD:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagSqlDb" Grid.Column="1" Text="—" FontSize="12"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </materialDesign:Card>
+
+                                <!-- SDK / Empresa Card -->
+                                <materialDesign:Card Grid.Column="2" Padding="16">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                            <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16"
+                                                                     Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                            <TextBlock Text="SDK / Empresa CONTPAQi" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Acceso:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagEmpresaStatus" Grid.Column="1" Text="—" FontWeight="SemiBold" FontSize="12"/>
+                                        </Grid>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Carpeta:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagEmpresaPath" Grid.Column="1" Text="—" FontSize="12" TextWrapping="Wrap"/>
+                                        </Grid>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Sistema:" Opacity="0.55" FontSize="12"/>
+                                            <TextBlock x:Name="DiagSistema" Grid.Column="1" Text="—" FontSize="12"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </materialDesign:Card>
+                            </Grid>
+
+                            <!-- API Log preview -->
+                            <materialDesign:Card Padding="16">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                        <materialDesign:PackIcon Kind="FileDocument" Width="16" Height="16"
+                                                                 Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                        <TextBlock Text="Últimas entradas — ApiServer.log" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <Border Background="#080C12" CornerRadius="4" Padding="10" MaxHeight="165">
+                                        <ScrollViewer x:Name="DiagLogScroll" VerticalScrollBarVisibility="Auto">
+                                            <TextBlock x:Name="TxtApiLogPreview" Foreground="#3DDC84"
+                                                       FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"
+                                                       Text="Presiona 'Actualizar' para cargar las últimas entradas del log."/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </StackPanel>
+                            </materialDesign:Card>
+
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
             </TabItem>
-            
-            <!-- Pestaña Configuración CONTPAQi -->
-            <TabItem Header="Configuración CONTPAQi">
-                <StackPanel Margin="20">
-                    
-                    <TextBlock Text="Sistema CONTPAQi" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <ComboBox x:Name="CmbSistema" Margin="0,0,0,20"
-                              materialDesign:HintAssist.Hint="Selecciona el sistema"
-                              Style="{StaticResource MaterialDesignFloatingHintComboBox}">
-                        <ComboBoxItem Content="CONTPAQi Comercial Premium" Tag="Comercial" IsSelected="True"/>
-                        <ComboBoxItem Content="CONTPAQi Factura Electrónica" Tag="FacturaElectronica"/>
-                    </ComboBox>
 
-                    <TextBlock Text="Directorio de Empresa" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <Grid Margin="0,0,0,20">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="TxtDirectorioEmpresa"
-                                 Grid.Column="0"
-                                 materialDesign:HintAssist.Hint="Ruta Ejemplo: C:\Compac\Empresas\..."
-                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
-                                 Margin="0,0,8,0"/>
-                        <Button x:Name="BtnBrowseEmpresa"
-                                Grid.Column="1"
-                                ToolTip="Seleccionar carpeta de empresa"
-                                Width="40" Height="40"
-                                Style="{StaticResource MaterialDesignOutlinedButton}"
-                                Click="BtnBrowseEmpresa_Click"
-                                Padding="4">
-                            <materialDesign:PackIcon Kind="FolderOpen" Width="20" Height="20"/>
-                        </Button>
-                    </Grid>
+            <!-- ══════════════════════════════════ -->
+            <!--   TAB 4 — SEGURIDAD                -->
+            <!-- ══════════════════════════════════ -->
+            <TabItem Header="  Seguridad  ">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20,18">
 
-                    <TextBlock Text="Usuario Comercial" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <TextBox x:Name="TxtUsuario" Text="SUPERVISOR" Margin="0,0,0,20" materialDesign:HintAssist.Hint="Usuario" Style="{StaticResource MaterialDesignFloatingHintTextBox}"/>
+                        <!-- Header -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
+                            <materialDesign:PackIcon Kind="Shield" Width="22" Height="22"
+                                                     Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Configuración de Seguridad" FontSize="17"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
 
-                    <TextBlock Text="Contraseña Comercial" FontWeight="Bold" Margin="0,0,0,5"/>
-                    <PasswordBox x:Name="TxtPassword" Margin="0,0,0,30" materialDesign:HintAssist.Hint="Contraseña (dejar en blanco si no tiene)" Style="{StaticResource MaterialDesignFloatingHintPasswordBox}"/>
+                        <!-- ── Card: API Key ── -->
+                        <materialDesign:Card Padding="16" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <materialDesign:PackIcon Kind="Key" Width="16" Height="16"
+                                                             Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="API Key" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBlock FontSize="11" Opacity="0.55" TextWrapping="Wrap" Margin="0,0,0,12"
+                                           Text="Clave usada para autenticación vía header X-Api-Key. Se autogenera en el primer arranque de la API."/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="40"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtApiKey" Grid.Column="0" IsReadOnly="True"
+                                             materialDesign:HintAssist.Hint="API Key (generada por la API en el primer arranque)"
+                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                             FontFamily="Consolas" FontSize="12"/>
+                                    <Button Grid.Column="2" Width="40" Height="40" Padding="6"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                                            Click="BtnCopyApiKey_Click" ToolTip="Copiar API Key al portapapeles">
+                                        <materialDesign:PackIcon Kind="ContentCopy" Width="18" Height="18"/>
+                                    </Button>
+                                    <Button Grid.Column="4" Width="40" Height="40" Padding="6"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                                            Click="BtnRegenApiKey_Click" ToolTip="Regenerar API Key">
+                                        <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18"/>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </materialDesign:Card>
 
-                    <Button Content="GUARDAR CONFIGURACIÓN" HorizontalAlignment="Right" Width="200" Click="BtnSaveConfig_Click"/>
-                </StackPanel>
+                        <!-- ── Card: JWT Secret ── -->
+                        <materialDesign:Card Padding="16" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <materialDesign:PackIcon Kind="Lock" Width="16" Height="16"
+                                                             Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="JWT Secret Key" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <TextBlock FontSize="11" Opacity="0.55" TextWrapping="Wrap" Margin="0,0,0,12"
+                                           Text="Clave secreta para firmar tokens JWT. Cambiarla invalidará todos los tokens activos inmediatamente."/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="40"/>
+                                        <ColumnDefinition Width="8"/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtJwtSecret" Grid.Column="0"
+                                             materialDesign:HintAssist.Hint="JWT Secret Key"
+                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                             FontFamily="Consolas" FontSize="12"/>
+                                    <Button Grid.Column="2" Width="40" Height="40" Padding="6"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                                            Click="BtnCopyJwtSecret_Click" ToolTip="Copiar JWT Secret al portapapeles">
+                                        <materialDesign:PackIcon Kind="ContentCopy" Width="18" Height="18"/>
+                                    </Button>
+                                    <Button Grid.Column="4" Width="40" Height="40" Padding="6"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                                            Click="BtnRegenJwtSecret_Click" ToolTip="Regenerar JWT Secret">
+                                        <materialDesign:PackIcon Kind="Refresh" Width="18" Height="18"/>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </materialDesign:Card>
+
+                        <!-- ── Card: Opciones de Acceso ── -->
+                        <materialDesign:Card Padding="16" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                    <materialDesign:PackIcon Kind="AccountLock" Width="16" Height="16"
+                                                             Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="Opciones de Acceso" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="TglRequireApiKey"
+                                                  Style="{StaticResource MaterialDesignSwitchToggleButton}"/>
+                                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="Requerir API Key para Login" FontWeight="SemiBold"/>
+                                        <TextBlock FontSize="11" Opacity="0.55" TextWrapping="Wrap"
+                                                   Text="Si está activo, el endpoint /auth/login también requiere el header X-Api-Key."/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </materialDesign:Card>
+
+                        <!-- ── Card: Auto-inicio ── -->
+                        <materialDesign:Card Padding="16" Margin="0,0,0,14">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                    <materialDesign:PackIcon Kind="Microsoft" Width="16" Height="16"
+                                                             Foreground="#CE93D8" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                    <TextBlock Text="Auto-inicio con Windows" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                    <ToggleButton x:Name="TglAutoStart"
+                                                  Style="{StaticResource MaterialDesignSwitchToggleButton}"
+                                                  Checked="TglAutoStart_Checked" Unchecked="TglAutoStart_Unchecked"/>
+                                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="Iniciar Server Manager al arrancar Windows" FontWeight="SemiBold"/>
+                                        <TextBlock FontSize="11" Opacity="0.55"
+                                                   Text="Agrega o quita una entrada en el registro de Windows (HKCU\...\Run)."/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="TglAutoStartApi"
+                                                  Style="{StaticResource MaterialDesignSwitchToggleButton}"
+                                                  IsEnabled="False"/>
+                                    <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <TextBlock Text="Iniciar API automáticamente al abrir" FontWeight="SemiBold"/>
+                                        <TextBlock FontSize="11" Opacity="0.55"
+                                                   Text="Si está activo, la API se inicia automáticamente al abrir el Server Manager."/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </materialDesign:Card>
+
+                        <Button Content="GUARDAR CONFIGURACIÓN DE SEGURIDAD" Height="40" Padding="20,0"
+                                HorizontalAlignment="Right" Click="BtnSaveSecurityConfig_Click"/>
+
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
+
         </TabControl>
     </Grid>
 </Window>

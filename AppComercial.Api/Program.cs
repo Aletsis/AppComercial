@@ -18,6 +18,9 @@ using AppComercial.Infrastructure.Sdk;
 using AppComercial.Application.Common.Interfaces;
 using Microsoft.OpenApi.Models;
 using System.Runtime.Versioning;
+using AppComercial.Api.Gateway.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 
 [assembly: SupportedOSPlatform("windows")]
 
@@ -46,6 +49,16 @@ public static class ApiServer
             ContentRootPath = AppContext.BaseDirectory
         };
         var builder = WebApplication.CreateBuilder(options);
+
+        // Directorio de configuración en ProgramData
+        var programDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "AppComercial");
+        var apiConfigPath = Path.Combine(programDataDir, "Api", "appsettings.json");
+
+        // Si existe el appsettings.json en ProgramData, agregarlo como proveedor principal de configuración
+        if (File.Exists(apiConfigPath))
+        {
+            builder.Configuration.AddJsonFile(apiConfigPath, optional: true, reloadOnChange: true);
+        }
         
         // Configurar la URL de escucha desde appsettings.json (permitiendo acceso externo si se usa http://*:5271)
         var listenUrl = builder.Configuration["ApiSettings:ListenUrl"] ?? "http://*:5271";
@@ -61,7 +74,13 @@ public static class ApiServer
         }
 
         // Add services to the container.
-        builder.Services.AddControllers()
+        builder.Services.AddControllers(options =>
+        {
+            var policy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build();
+            options.Filters.Add(new AuthorizeFilter(policy));
+        })
                .AddApplicationPart(typeof(ApiServer).Assembly); // Forzar carga de controladores
 
         builder.Services.AddEndpointsApiExplorer();
@@ -124,26 +143,105 @@ public static class ApiServer
             options.SubstituteApiVersionInUrl = true;
         });
 
-        var secretKey = builder.Configuration["JwtSettings:SecretKey"] ?? "SUPER_CLAVE_SECRETA_LARGA_123456789";
+        // ── JWT Secret: autogenerar si está vacío (igual que ApiKey) ────────────────
+        // IMPORTANTE: debe hacerse ANTES de builder.Build() para que el mismo
+        // secreto se use en la configuración de autenticación Y quede guardado en disco.
+        var secretKey = builder.Configuration["JwtSettings:SecretKey"];
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            secretKey = $"{Guid.NewGuid()}_{Guid.NewGuid()}_SuperSecretKeyForProductionLongEnough256Bits";
+            var jwtSettingsPath = File.Exists(apiConfigPath) ? apiConfigPath : Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+            try
+            {
+                string jwtJson = File.Exists(jwtSettingsPath) ? File.ReadAllText(jwtSettingsPath) : "{}";
+                var jwtRoot = System.Text.Json.Nodes.JsonNode.Parse(jwtJson)?.AsObject();
+                if (jwtRoot != null)
+                {
+                    if (jwtRoot["JwtSettings"] == null)
+                        jwtRoot["JwtSettings"] = new System.Text.Json.Nodes.JsonObject();
+                    jwtRoot["JwtSettings"]!["SecretKey"] = secretKey;
+                    File.WriteAllText(jwtSettingsPath,
+                        jwtRoot.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                    logAction?.Invoke($"[SEGURIDAD] JWT Secret autogenerado y guardado en appsettings.json.");
+                }
+            }
+            catch (Exception ex)
+            {
+                logAction?.Invoke($"[SEGURIDAD WARN] No se pudo persistir el JWT Secret: {ex.Message}");
+            }
+        }
         var key = Encoding.UTF8.GetBytes(secretKey);
 
-        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+        builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = "ApiKeyOrJwt";
+            options.DefaultChallengeScheme = "ApiKeyOrJwt";
+        })
+        .AddPolicyScheme("ApiKeyOrJwt", "ApiKeyOrJwt", options =>
+        {
+            options.ForwardDefaultSelector = context =>
             {
-                options.RequireHttpsMetadata = false;
-                options.SaveToken = true;
-                options.TokenValidationParameters = new TokenValidationParameters
+                if (context.Request.Headers.ContainsKey("X-Api-Key"))
                 {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero
-                };
-            });
+                    return "ApiKey";
+                }
+                return JwtBearerDefaults.AuthenticationScheme;
+            };
+        })
+        .AddJwtBearer(options =>
+        {
+            options.RequireHttpsMetadata = false;
+            options.SaveToken = true;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            };
+        })
+        .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>("ApiKey", null);
 
         var app = builder.Build();
+
+        // ── Autogenerar API Key de seguridad en el primer arranque ────────────────────────
+        var config = app.Services.GetRequiredService<IConfiguration>();
+        var apiKey = config["ApiSettings:ApiKey"];
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            var newKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+            var appSettingsPath = File.Exists(apiConfigPath) ? apiConfigPath : Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+            try
+            {
+                string jsonContent = File.Exists(appSettingsPath) ? File.ReadAllText(appSettingsPath) : "{}";
+                var rootNode = System.Text.Json.Nodes.JsonNode.Parse(jsonContent)?.AsObject();
+                if (rootNode != null)
+                {
+                    var apiSettings = rootNode["ApiSettings"]?.AsObject();
+                    if (apiSettings == null)
+                    {
+                        apiSettings = new System.Text.Json.Nodes.JsonObject();
+                        rootNode["ApiSettings"] = apiSettings;
+                    }
+
+                    apiSettings["ApiKey"] = newKey;
+                    if (apiSettings["RequireApiKeyForLogin"] == null)
+                    {
+                        apiSettings["RequireApiKeyForLogin"] = false;
+                    }
+
+                    File.WriteAllText(appSettingsPath, rootNode.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                    logAction?.Invoke($"[SEGURIDAD] API Key autogenerada de forma segura y guardada en appsettings.json: {newKey}");
+                }
+            }
+            catch (Exception ex)
+            {
+                logAction?.Invoke($"[SEGURIDAD ERROR] Error al guardar la API Key autogenerada: {ex.Message}");
+            }
+        }
+
 
         app.UseGlobalExceptionHandler();
         app.UseRequestResponseLogging();

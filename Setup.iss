@@ -14,8 +14,19 @@ PrivilegesRequired=admin
 [Files]
 ; IMPORTANTE: Antes de compilar este instalador, debes hacer un dotnet publish de ambos proyectos
 ; Ejemplo: dotnet publish AppComercial.Api -c Release -o AppComercial.Api\bin\publish
+; Binarios en Program Files (solo lectura en runtime — correcta práctica Windows)
 Source: "AppComercial.Api\bin\publish\*"; DestDir: "{app}\Api"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "AppComercial.ServerManager\bin\publish\*"; DestDir: "{app}\ServerManager"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+; Configuración mutable en ProgramData (escribible por usuarios sin UAC)
+; onlyifdoesntexist: preserva config del usuario en upgrades; el PSCommand post-install actualiza los campos SQL
+Source: "AppComercial.Api\bin\publish\appsettings.json"; DestDir: "{commonappdata}\AppComercial\Api"; Flags: ignoreversion onlyifdoesntexist
+Source: "AppComercial.ServerManager\bin\publish\appsettings.json"; DestDir: "{commonappdata}\AppComercial\ServerManager"; Flags: ignoreversion onlyifdoesntexist
+
+[Dirs]
+; Crear carpetas ProgramData con permisos de escritura para usuarios estándar (sin UAC)
+Name: "{commonappdata}\AppComercial\Api"; Permissions: users-modify
+Name: "{commonappdata}\AppComercial\ServerManager"; Permissions: users-modify
 
 [Icons]
 Name: "{group}\AppComercial Server Manager"; Filename: "{app}\ServerManager\AppComercial.ServerManager.exe"
@@ -25,17 +36,21 @@ Name: "{commondesktop}\AppComercial Server Manager"; Filename: "{app}\ServerMana
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Run]
-; Instala el servicio de Windows de la API para que corra en automático al prender la PC (y como LocalSystem)
-Filename: "sc.exe"; Parameters: "create AppComercialApi binPath= ""{app}\Api\AppComercial.Api.exe"" start= auto DisplayName= ""AppComercial POS API Service"""; Flags: runhidden
-; Inicia el servicio de inmediato
-Filename: "sc.exe"; Parameters: "start AppComercialApi"; Flags: runhidden
 ; Lanza el UI del Server Manager para que el usuario pueda ver que todo está corriendo
 Filename: "{app}\ServerManager\AppComercial.ServerManager.exe"; Description: "Lanzar Server Manager ahora"; Flags: nowait postinstall skipifsilent
 
+[Registry]
+; Agregar el ServerManager al arranque de Windows para que inicie la API automáticamente cuando el usuario inicie sesión
+Root: HKCU; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "AppComercialServerManager"; ValueData: """{app}\ServerManager\AppComercial.ServerManager.exe"""
+
 [UninstallRun]
-; Detiene y elimina el servicio si se desinstala el programa
-Filename: "sc.exe"; Parameters: "stop AppComercialApi"; Flags: runhidden
-Filename: "sc.exe"; Parameters: "delete AppComercialApi"; Flags: runhidden
+; Matar procesos durante desinstalación
+Filename: "taskkill.exe"; Parameters: "/F /IM AppComercial.ServerManager.exe"; Flags: runhidden skipifdoesntexist
+Filename: "taskkill.exe"; Parameters: "/F /IM AppComercial.Api.exe"; Flags: runhidden skipifdoesntexist
+
+[UninstallDelete]
+Type: filesandordirs; Name: "C:\AppComercialLogs"
+Type: filesandordirs; Name: "{commonappdata}\AppComercial"
 
 [Code]
 var
@@ -79,16 +94,18 @@ begin
   DbPage := CreateInputQueryPage(SystemPage.ID,
     'Configuración de Base de Datos SQL Server', 'Ingrese sus credenciales de SQL Desktop/Server',
     'Ingrese los datos de conexión para vincular AppComercial con la base de datos (SQL) de su Empresa.');
-  DbPage.Add('Servidor SQL (Instancia, Ej. localhost\COMPAC):', False);
-  DbPage.Add('Base de Datos (Nombre Empresa, Ej. adEMPRESA):', False);
-  DbPage.Add('Usuario (Ej. sa):', False);
-  DbPage.Add('Contraseña:', True);
+  DbPage.Add('Servidor SQL (Instancia, Ej. localhost\COMPAC2019):', False);
+  DbPage.Add('Base de Datos Empresa (Ej. adEMPRESA):', False);
+  DbPage.Add('Usuario SQL (Ej. sa):', False);
+  DbPage.Add('Contraseña SQL:', True);
+  DbPage.Add('Directorio de Empresa CONTPAQi (Ej. C:\Compac\Empresas\adEMPRESA):', False);
 
-  { Valores por defecto convenientes acordes a tu appsettings }
-  DbPage.Values[0] := '.\PCOMERCIAL';
-  DbPage.Values[1] := 'adEMPRESA_DE_PRUEBA';
+  { Valores por defecto }
+  DbPage.Values[0] := 'localhost\COMPAC2019';
+  DbPage.Values[1] := 'adEMPRESA';
   DbPage.Values[2] := 'sa';
   DbPage.Values[3] := '';
+  DbPage.Values[4] := 'C:\Compac\Empresas\';
 end;
 
 { 3. PRUEBA DE CONEXIÓN UTILIZANDO ADODB COM OBJECT }
@@ -124,29 +141,41 @@ begin
 end;
 
 { 4. INYECCIÓN DEL APPSETTINGS.JSON }
-procedure UpdateAppSettingsViaPS(AppPath, Server, Db, User, Pass, SistemaSTR: String);
+{ Los archivos se escriben en ProgramData, no en Program Files (que es solo lectura) }
+procedure UpdateAppSettingsViaPS(AppPath, Server, Db, User, Pass, SistemaSTR, DirEmpresa: String);
 var
   PSCommand: String;
-  ConnStrA, ConnStrB: String;
+  ConnStrA, ConnStrB, ConnStrC: String;
+  ProgramDataPath: String;
   ResultCode: Integer;
 begin
-  { TrustServerCertificate=True previene errores en conexiones SSL de certificados auto-firmados comunes en SQLExpress }
+  { TrustServerCertificate=True previene errores de SSL en SQLExpress con certificados auto-firmados }
   ConnStrA := 'Server=' + Server + ';Database=' + Db + ';User Id=' + User + ';Password=' + Pass + ';Encrypt=False;TrustServerCertificate=True;';
   ConnStrB := 'Server=' + Server + ';Database=CompacWAdmin;User Id=' + User + ';Password=' + Pass + ';Encrypt=False;TrustServerCertificate=True;';
-  
-  { Creamos un script de PowerShell Inline para editar el JSON de forma estructurada }
-  PSCommand := 
-    '$pathApi = ''' + AppPath + '\Api\appsettings.json''; ' +
-    '$pathSm = ''' + AppPath + '\ServerManager\appsettings.json''; ' +
+  ConnStrC := 'Server=' + Server + ';Database=RepositorioAdminPAQ;User Id=' + User + ';Password=' + Pass + ';Encrypt=False;TrustServerCertificate=True;';
+
+  { Ruta de configuración mutable: ProgramData\AppComercial (escribible sin UAC) }
+  ProgramDataPath := ExpandConstant('{commonappdata}') + '\AppComercial';
+
+  { Script de PowerShell que actualiza AMBOS appsettings.json (Api y ServerManager) en ProgramData }
+  PSCommand :=
+    '$pathApi = ''' + ProgramDataPath + '\Api\appsettings.json''; ' +
+    '$pathSm = ''' + ProgramDataPath + '\ServerManager\appsettings.json''; ' +
     'foreach ($path in @($pathApi, $pathSm)) { ' +
     '  if (Test-Path $path) { ' +
-    '    $json = Get-Content -Raw $path | ConvertFrom-Json; ' +
-    '    if (-not $json.ConnectionStrings) { $json | Add-Member -Type NoteProperty -Name ConnectionStrings -Value (New-Object PSObject) } ; ' +
-    '    $json.ConnectionStrings.ContpaqiComercial = ''' + ConnStrA + '''; ' +
-    '    $json.ConnectionStrings.CompacWAdmin = ''' + ConnStrB + '''; ' +
-    '    if (-not $json.Contpaqi) { $json | Add-Member -Type NoteProperty -Name Contpaqi -Value (New-Object PSObject) } ; ' +
-    '    $json.Contpaqi.Sistema = ''' + SistemaSTR + '''; ' +
-    '    $json | ConvertTo-Json -Depth 10 | Set-Content $path -Encoding UTF8; ' +
+    '    $j = Get-Content -Raw $path | ConvertFrom-Json; ' +
+    '    if (-not $j.ConnectionStrings) { $j | Add-Member -Type NoteProperty -Name ConnectionStrings -Value (New-Object PSObject) -Force }; ' +
+    '    $j.ConnectionStrings | Add-Member -NotePropertyName ContpaqiComercial -NotePropertyValue ''' + ConnStrA + ''' -Force; ' +
+    '    $j.ConnectionStrings | Add-Member -NotePropertyName CompacWAdmin -NotePropertyValue ''' + ConnStrB + ''' -Force; ' +
+    '    $j.ConnectionStrings | Add-Member -NotePropertyName RepositorioAdminPAQ -NotePropertyValue ''' + ConnStrC + ''' -Force; ' +
+    '    if (-not $j.Contpaqi) { $j | Add-Member -Type NoteProperty -Name Contpaqi -Value (New-Object PSObject) -Force }; ' +
+    '    $j.Contpaqi | Add-Member -NotePropertyName Sistema -NotePropertyValue ''' + SistemaSTR + ''' -Force; ' +
+    '    $j.Contpaqi | Add-Member -NotePropertyName DirectorioEmpresa -NotePropertyValue ''' + DirEmpresa + ''' -Force; ' +
+    '    $j.Contpaqi | Add-Member -NotePropertyName Usuario -NotePropertyValue ''SUPERVISOR'' -Force; ' +
+    '    $j.Contpaqi | Add-Member -NotePropertyName Contrasena -NotePropertyValue '''' -Force; ' +
+    '    if (-not $j.ApiSettings) { $j | Add-Member -Type NoteProperty -Name ApiSettings -Value (New-Object PSObject) -Force }; ' +
+    '    $j.ApiSettings | Add-Member -NotePropertyName ListenUrl -NotePropertyValue ''http://*:5271'' -Force; ' +
+    '    $j | ConvertTo-Json -Depth 10 | Set-Content $path -Encoding UTF8; ' +
     '  } ' +
     '}';
 
@@ -159,6 +188,15 @@ var
 begin
   if CurStep = ssPostInstall then begin
     if SystemPage.Values[0] then SistemaSTR := 'Comercial' else SistemaSTR := 'FacturaElectronica';
-    UpdateAppSettingsViaPS(ExpandConstant('{app}'), DbPage.Values[0], DbPage.Values[1], DbPage.Values[2], DbPage.Values[3], SistemaSTR);
+
+    { Values[0]=Server, [1]=DB, [2]=User, [3]=Pass, [4]=DirEmpresa }
+    UpdateAppSettingsViaPS(
+      ExpandConstant('{app}'),
+      DbPage.Values[0],
+      DbPage.Values[1],
+      DbPage.Values[2],
+      DbPage.Values[3],
+      SistemaSTR,
+      DbPage.Values[4]);
   end;
 end;

@@ -13,6 +13,7 @@ public class GetComprasQuery : IRequest<IEnumerable<AdmDocumentos>>
 {
     public string? CodigoConcepto { get; set; }
     public string? Serie { get; set; }
+    public double? Folio { get; set; }
     public DateTime? FechaDesde { get; set; }
     public DateTime? FechaHasta { get; set; }
     public int? ProveedorId { get; set; }
@@ -53,6 +54,9 @@ public class GetComprasQueryHandler : IRequestHandler<GetComprasQuery, IEnumerab
 
         if (!string.IsNullOrEmpty(request.Serie))
             query = query.Where(d => d.CSERIEDOCUMENTO == request.Serie);
+
+        if (request.Folio.HasValue)
+            query = query.Where(d => d.CFOLIO == request.Folio.Value);
 
         if (request.FechaDesde.HasValue)
             query = query.Where(d => d.CFECHA >= request.FechaDesde.Value);

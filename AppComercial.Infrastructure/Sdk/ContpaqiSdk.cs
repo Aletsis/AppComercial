@@ -57,6 +57,24 @@ public class ContpaqiSdk : IContpaqiSdk
     [DllImport("MGW_SDK.dll", EntryPoint = "fCierraEmpresa",   CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern void F_fCierraEmpresa();
 
+    [DllImport("MGW_SDK.dll", EntryPoint = "fEmitirDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int  F_fEmitirDocumento(string aCodConcepto, string aSerie, double aFolio, string aPassword, string aArchivoAdicional);
+
+    [DllImport("MGW_SDK.dll", EntryPoint = "fBuscarDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int  F_fBuscarDocumento(string aCodConcepto, string aSerie, string aFolio);
+
+    [DllImport("MGW_SDK.dll", EntryPoint = "fLeeDatoDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int  F_fLeeDatoDocumento(string aCampo, StringBuilder aValor, int aLongitud);
+
+    [DllImport("MGW_SDK.dll", EntryPoint = "fLeeDatoConceptoDocto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int  F_fLeeDatoConceptoDocto(string aCampo, StringBuilder aValor, int aLongitud);
+
+    [DllImport("MGW_SDK.dll", EntryPoint = "fBuscaProducto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int  F_fBuscaProducto(string aCodigo);
+
+    [DllImport("MGW_SDK.dll", EntryPoint = "fError", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern void F_fError(int aNumeroError, StringBuilder aMensaje, int aLongitud);
+
     // ─────────────────────────────────────────────────────────────────
     //  Despacho unificado — llama a la DLL correcta según _sistemaActual
     // ─────────────────────────────────────────────────────────────────
@@ -64,6 +82,23 @@ public class ContpaqiSdk : IContpaqiSdk
     private void Sdk_fCierraEmpresa()             { if (_sistemaActual == SistemaContpaqi.FacturaElectronica) F_fCierraEmpresa();    else C_fCierraEmpresa(); }
     private void Sdk_fTerminaSDK()                { if (_sistemaActual == SistemaContpaqi.FacturaElectronica) F_fTerminaSDK();       else C_fTerminaSDK();    }
     private void Sdk_fInicioSesionSDK(string u, string p) { if (_sistemaActual == SistemaContpaqi.FacturaElectronica) F_fInicioSesionSDK(u, p); else C_fInicioSesionSDK(u, p); }
+
+    private int Sdk_fEmitirDocumento(string c, string s, double f, string p, string a)
+        => _sistemaActual == SistemaContpaqi.FacturaElectronica ? F_fEmitirDocumento(c, s, f, p, a) : fEmitirDocumento(c, s, f, p, a);
+
+    private int Sdk_fBuscarDocumento(string c, string s, string f)
+        => _sistemaActual == SistemaContpaqi.FacturaElectronica ? F_fBuscarDocumento(c, s, f) : fBuscarDocumento(c, s, f);
+
+    private int Sdk_fLeeDatoDocumento(string aCampo, StringBuilder aValor, int aLongitud)
+        => _sistemaActual == SistemaContpaqi.FacturaElectronica ? F_fLeeDatoDocumento(aCampo, aValor, aLongitud) : fLeeDatoDocumento(aCampo, aValor, aLongitud);
+
+    private int Sdk_fLeeDatoConceptoDocto(string aCampo, StringBuilder aValor, int aLongitud)
+        => _sistemaActual == SistemaContpaqi.FacturaElectronica ? F_fLeeDatoConceptoDocto(aCampo, aValor, aLongitud) : fLeeDatoConceptoDocto(aCampo, aValor, aLongitud);
+
+    private void Sdk_fError(int e, StringBuilder m, int l)
+    {
+        if (_sistemaActual == SistemaContpaqi.FacturaElectronica) F_fError(e, m, l); else fError(e, m, l);
+    }
 
     // ─────────────────────────────────────────────────────────────────
     //  Resolución del directorio de binarios según sistema y Registro
@@ -121,13 +156,21 @@ public class ContpaqiSdk : IContpaqiSdk
                 $"El directorio de binarios del SDK ({sistema}) no existe: '{directorioBase}'. " +
                 "Verifique que CONTPAQi esté instalado correctamente.");
 
-        // Cambiar el Working Directory es indispensable para que Windows resuelva
-        // MGWServicios.dll o MGW_SDK.dll desde la carpeta de instalación del producto.
+        _directorioBinariosActual = directorioBase;
         Directory.SetCurrentDirectory(directorioBase);
     }
 
     private static bool _seInicializoSdkEnEsteProceso = false;
     private static SistemaContpaqi _sistemaActual = SistemaContpaqi.Comercial;
+    private static string? _directorioBinariosActual = null;
+
+    public static void AsegurarDirectorioBinarios()
+    {
+        if (!string.IsNullOrEmpty(_directorioBinariosActual))
+        {
+            Directory.SetCurrentDirectory(_directorioBinariosActual);
+        }
+    }
 
     public async Task IniciarSesionAsync(string nombreUsuario = "SUPERVISOR", string contrasena = "", SistemaContpaqi sistema = SistemaContpaqi.Comercial)
     {
@@ -257,6 +300,9 @@ public class ContpaqiSdk : IContpaqiSdk
 
     [DllImport("MGWServicios.dll", EntryPoint = "fBuscaCteProv", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fBuscaCteProv(string aCodigo);
+
+    private int Sdk_fBuscaCteProv(string aCodigo) => fBuscaCteProv(aCodigo ?? "");
+    private int Sdk_fBuscaProducto(string aCodigo) => fBuscaProducto(aCodigo ?? "");
 
     [DllImport("MGWServicios.dll", EntryPoint = "fEditaCteProv", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fEditaCteProv();
@@ -594,9 +640,84 @@ public class ContpaqiSdk : IContpaqiSdk
         await _sdkSemaphore.WaitAsync();
         try
         {
-            var result = fEmitirDocumento(codigoConcepto, serie, folio, pass, email);
+            // Indispensable: las DLLs de firmado (SelloDigital.dll) se cargan dinámicamente
+            // y requieren que el CurrentDirectory sea la carpeta de binarios de CONTPAQi.
+            AsegurarDirectorioBinarios();
+
+            // 1. Asegurar que el "cursor" del SDK esté en el documento correcto. 
+            // Muchos problemas de 'External component' ocurren porque el SDK pierde el foco interno.
+            var searchResult = Sdk_fBuscarDocumento(codigoConcepto ?? "", serie ?? "", folio.ToString("0"));
+            if (searchResult != 0)
+            {
+                 LanzarExcepcionErrorSDK(searchResult, $"No se pudo localizar el documento para timbrar (Concepto: {codigoConcepto}, Serie: {serie}, Folio: {folio})");
+            }
+
+            // 2. Intentar la emisión.
+            var result = Sdk_fEmitirDocumento(
+                codigoConcepto ?? "", 
+                serie ?? "", 
+                folio, 
+                pass ?? "", 
+                email ?? "");
+
             LanzarExcepcionErrorSDK(result, "Error al timbrar/emitir documento en SDK.");
             return 1;
+        }
+        finally
+        {
+            _sdkSemaphore.Release();
+        }
+    }
+
+    public async Task<Dictionary<string, string>> EmitirDocumentoYLeerDatosAsync(string codigoConcepto, string serie, double folio, string pass, string email, IEnumerable<string> campos)
+    {
+        await _sdkSemaphore.WaitAsync();
+        try
+        {
+            AsegurarDirectorioBinarios();
+
+            // 1. Asegurar que el "cursor" del SDK esté en el documento correcto. 
+            var searchResult = Sdk_fBuscarDocumento(codigoConcepto ?? "", serie ?? "", folio.ToString("0"));
+            if (searchResult != 0)
+            {
+                 LanzarExcepcionErrorSDK(searchResult, $"No se pudo localizar el documento para timbrar (Concepto: {codigoConcepto}, Serie: {serie}, Folio: {folio})");
+            }
+
+            // 2. Intentar la emisión.
+            var result = Sdk_fEmitirDocumento(
+                codigoConcepto ?? "", 
+                serie ?? "", 
+                folio, 
+                pass ?? "", 
+                email ?? "");
+
+            LanzarExcepcionErrorSDK(result, "Error al timbrar/emitir documento en SDK.");
+
+            // 3. Leer los campos fiscales y otros solicitados inmediatamente bajo el mismo semáforo
+            var resultados = new Dictionary<string, string>();
+            foreach (var campo in campos)
+            {
+                if (string.IsNullOrWhiteSpace(campo)) continue;
+                try
+                {
+                    StringBuilder sb = new StringBuilder(5000);
+                    int readResult = Sdk_fLeeDatoDocumento(campo, sb, 5000);
+                    if (readResult == 0)
+                    {
+                        resultados[campo] = sb.ToString();
+                    }
+                    else
+                    {
+                        resultados[campo] = string.Empty;
+                    }
+                }
+                catch
+                {
+                    resultados[campo] = string.Empty;
+                }
+            }
+
+            return resultados;
         }
         finally
         {
@@ -690,15 +811,15 @@ public class ContpaqiSdk : IContpaqiSdk
             if (fnEdita != null)
             {
                 result = fnEdita();
-                LanzarExcepcionErrorSDK(result, "Error al iniciar edición de {entidad}. Código error:");
+                LanzarExcepcionErrorSDK(result, $"Error al iniciar edición de {entidad}. Código error:");
             }
 
             try
             {
                 foreach (var dato in datos)
                 {
-                    result = fnSetDato(dato.Key, dato.Value);
-                    LanzarExcepcionErrorSDK(result, "Error al setear campo '{dato.Key}' en {entidad}. Código error:");
+                    result = fnSetDato(dato.Key, dato.Value ?? "");
+                    LanzarExcepcionErrorSDK(result, $"Error al setear campo '{dato.Key}' en {entidad}. Código error:");
                 }
 
                 result = fnGuarda();
@@ -798,6 +919,28 @@ public class ContpaqiSdk : IContpaqiSdk
     private static extern int fCancelarModificacionDocumento();
     [DllImport("MGWServicios.dll", EntryPoint = "fDesbloqueaDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fDesbloqueaDocumento();
+
+    [DllImport("MGWServicios.dll", EntryPoint = "fLeeDatoDocumento", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fLeeDatoDocumento(string aCampo, StringBuilder aValor, int aLongitud);
+
+    [DllImport("MGWServicios.dll", EntryPoint = "fLeeDatoConceptoDocto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fLeeDatoConceptoDocto(string aCampo, StringBuilder aValor, int aLongitud);
+
+    public async Task<string> LeerDatoDocumentoAsync(string campo)
+    {
+        await _sdkSemaphore.WaitAsync();
+        try
+        {
+            StringBuilder sb = new StringBuilder(5000); // Algunos campos como CadenaOriginal son largos
+            int result = Sdk_fLeeDatoDocumento(campo ?? "", sb, 5000);
+            LanzarExcepcionErrorSDK(result, $"Error al leer campo {campo} del documento");
+            return sb.ToString();
+        }
+        finally
+        {
+            _sdkSemaphore.Release();
+        }
+    }
 
     public Task<int> ActualizarDocumentoAsync(string codigoConcepto, string serie, string folio, Dictionary<string, string> datos) =>
         EjecutarOperacionDictionaryAsync(() => fBuscarDocumento(codigoConcepto, serie, folio), fEditarDocumento, fSetDatoDocumento, fGuardaDocumento, datos, "Documento", () => fCancelarModificacionDocumento());
@@ -948,7 +1091,7 @@ public class ContpaqiSdk : IContpaqiSdk
         if (codigoError == 0) return;
 
         StringBuilder sb = new StringBuilder(512);
-        fError(codigoError, sb, 512);
+        Sdk_fError(codigoError, sb, 512);
         var mensaje = sb.ToString();
         
         // Agregar traducciones comunes si no hay mensaje

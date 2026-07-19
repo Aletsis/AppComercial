@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\AppComercial.Api\AppComercial.Api.csproj" />
     <ProjectReference Include="..\AppComercial.Infrastructure\AppComercial.Infrastructure.csproj" />
     <ProjectReference Include="..\AppComercial.Application\AppComercial.Application.csproj" />
   </ItemGroup>
@@ -19,7 +18,17 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="MaterialDesignThemes" Version="4.9.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.5" />
+  </ItemGroup>
+
+  <!-- El SDK WPF no copia appsettings.json automáticamente (a diferencia del Web SDK).
+       Se declara explícitamente para que aparezca en bin\ y en bin\publish\. -->
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

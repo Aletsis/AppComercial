@@ -56,7 +56,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
 
         if (usuario == null)
         {
-            throw new UnauthorizedAccessException($"El usuario '{request.Username}' no existe en la base de datos del sistema.");
+            throw new KeyNotFoundException($"El usuario '{request.Username}' no existe en la base de datos del sistema.");
         }
 
         // 2. Bypass Validación de Contraseña (MVP / API en red local)

@@ -41,7 +41,7 @@ public class CreateNotaCreditoCommand : IRequest<CreateNotaCreditoResult>
     public bool SaldarFacturaOrigen { get; set; } = true;
 
     /// <summary>Contraseña CSD para timbrado desatendido.</summary>
-    [Required] public string CsdPassword { get; set; } = string.Empty;
+    public string CsdPassword { get; set; } = string.Empty;
     public bool AutoTimbrar { get; set; } = true;
 
     [MinLength(1)] public List<NotaCreditoPartida> Partidas { get; set; } = new();
@@ -85,12 +85,12 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
 
         var idDocumento = await _sdk.CrearDocumentoAsync(documento);
 
-        // 2. Setear campos CFDI 4.0
+        // Según comunidad (Andres Ramos SDK): FormaPago -> CMETODOPAG, MetodoPago -> CCANTPARCI (1=PUE, 2=PPD)
         var campos = new Dictionary<string, string>
         {
-            ["USOCFDI"]    = request.UsoCfdi,
-            ["METODOPAGO"] = request.MetodoPago,
-            ["FORMAPAGO"]  = request.FormaPago,
+            ["cUsoCFDI"]    = request.UsoCfdi,
+            ["CMETODOPAG"]  = request.FormaPago,
+            ["CCANTPARCI"]  = request.MetodoPago.ToUpper() == "PPD" ? "2" : "1",
         };
         await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, campos);
 
@@ -122,6 +122,9 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
         bool timbrado = false;
         if (request.AutoTimbrar)
         {
+            if (string.IsNullOrWhiteSpace(request.CsdPassword))
+                throw new ArgumentException("La contraseña del CSD es requerida para timbrar la nota de crédito automáticamente.");
+
             await _sdk.EmitirDocumentoAsync(
                 request.CodigoConcepto,
                 request.Serie,

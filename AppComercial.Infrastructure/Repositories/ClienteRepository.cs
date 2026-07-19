@@ -31,7 +31,7 @@ public class ClienteRepository : IClienteRepository
     public async Task<IEnumerable<AdmClientes>> GetByNombreAsync(string nombre)
     {
         return await _context.Clientes.AsNoTracking()
-            .Where(c => c.CRAZONSOCIAL.Contains(nombre))
+            .Where(c => c.CRAZONSOCIAL != null && c.CRAZONSOCIAL.Contains(nombre))
             .ToListAsync();
     }
 }

@@ -37,6 +37,7 @@ public interface IContpaqiSdk
     Task<int> CrearDireccionAsync(tDireccion direccion);
     Task<int> CrearUnidadMedidaAsync(tUnidad unidad);
     Task<int> EmitirDocumentoAsync(string codigoConcepto, string serie, double folio, string pass, string email);
+    Task<Dictionary<string, string>> EmitirDocumentoYLeerDatosAsync(string codigoConcepto, string serie, double folio, string pass, string email, IEnumerable<string> campos);
     Task<int> CancelarDocumentoAsync(string codigoConcepto, string serie, double folio, string pass);
     Task<int> SaldarDocumentoAsync(string codigoConceptoDoc, string serieDoc, double folioDoc, string codigoConceptoPago, string seriePago, double folioPago);
     Task<int> AgregarRelacionCfdiAsync(string uuid, string tipoRelacion);
@@ -76,4 +77,9 @@ public interface IContpaqiSdk
     /// </summary>
     /// <returns>Ruta completa del archivo PDF generado en el servidor.</returns>
     Task<string> GenerarPdfAsync(string codigoConcepto, string serie, double folio, string rutaEmpresa);
+
+    /// <summary>
+    /// Lee un dato del documento que se encuentra actualmente en el "cursor" del SDK.
+    /// </summary>
+    Task<string> LeerDatoDocumentoAsync(string campo);
 }

@@ -2,6 +2,9 @@ using MediatR;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using System.ComponentModel.DataAnnotations;
+using AppComercial.Application.DTOs;
+using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 
 namespace AppComercial.Application.Features.Facturas;
 
@@ -30,7 +33,6 @@ public class CreateFacturaCommand : IRequest<CreateFacturaResult>
     public string FormaPago { get; set; } = "01";
 
     /// <summary>Contraseña del Sello Digital (CSD). Se usa para el timbrado automático.</summary>
-    [Required(ErrorMessage = "La contraseña del CSD es requerida para timbrar.")]
     public string CsdPassword { get; set; } = string.Empty;
 
     /// <summary>Email del receptor al que se enviará la factura. Opcional.</summary>
@@ -54,15 +56,23 @@ public class FacturaPartida
 public class CreateFacturaResult
 {
     public int IdDocumento { get; set; }
+    public string Serie { get; set; } = string.Empty;
+    public string Folio { get; set; } = string.Empty;
     public bool Timbrado { get; set; }
     public string? Mensaje { get; set; }
+    public TimbradoResult? DatosFiscales { get; set; }
 }
 
 public class CreateFacturaCommandHandler : IRequestHandler<CreateFacturaCommand, CreateFacturaResult>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly IConfiguration _configuration;
 
-    public CreateFacturaCommandHandler(IContpaqiSdk sdk) => _sdk = sdk;
+    public CreateFacturaCommandHandler(IContpaqiSdk sdk, IConfiguration configuration)
+    {
+        _sdk = sdk;
+        _configuration = configuration;
+    }
 
     public async Task<CreateFacturaResult> Handle(CreateFacturaCommand request, CancellationToken cancellationToken)
     {
@@ -80,17 +90,26 @@ public class CreateFacturaCommandHandler : IRequestHandler<CreateFacturaCommand,
 
         var idDocumento = await _sdk.CrearDocumentoAsync(documento);
 
-        // 2. Setear campos CFDI 4.0 vía fSetDatoDocumento
+        // 2. Setear campos CFDI 4.0 vía fSetDatoDocumento (ANTES de las partidas)
+        // Según comunidad (Andres Ramos SDK): FormaPago -> CMETODOPAG, MetodoPago -> CCANTPARCI (1=PUE, 2=PPD)
         var camposCfdi = new Dictionary<string, string>
         {
-            ["USOCFDI"]    = request.UsoCfdi,
-            ["METODOPAGO"] = request.MetodoPago,
-            ["FORMAPAGO"]  = request.FormaPago,
+            ["cUsoCFDI"]    = request.UsoCfdi,
+            ["CMETODOPAG"]  = request.FormaPago,
+            ["CCANTPARCI"]  = request.MetodoPago.ToUpper() == "PPD" ? "2" : "1",
         };
         if (!string.IsNullOrEmpty(request.CodigoAgente))
-            camposCfdi["CODIGOAGENTE"] = request.CodigoAgente;
+            camposCfdi["CCODIGOAGENTE"] = request.CodigoAgente;
 
-        await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, camposCfdi);
+        string? errorFiscal = null;
+        try 
+        { 
+            await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, camposCfdi); 
+        } 
+        catch (Exception ex)
+        { 
+            errorFiscal = $"Error campos fiscales: {ex.Message}";
+        }
 
         // 3. Agregar partidas
         foreach (var partida in request.Partidas)
@@ -109,30 +128,98 @@ public class CreateFacturaCommandHandler : IRequestHandler<CreateFacturaCommand,
             await _sdk.CrearMovimientoAsync(idDocumento, movimiento);
         }
 
-        // 4. Timbrar (emitir) el documento con el CSD provisto en la petición
+        // 4. Leer Folio y Serie reales asignados por el SDK (con Reintento y Fallback)
+        string folioReal = "0";
+        string serieReal = request.Serie;
+        try 
+        { 
+            folioReal = await _sdk.LeerDatoDocumentoAsync("CFOLIO"); 
+        } 
+        catch 
+        { 
+            try { folioReal = await _sdk.LeerDatoDocumentoAsync("cFolio"); } catch { folioReal = idDocumento.ToString(); }
+        }
+
+        try 
+        { 
+            serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIEDOCUMENTO"); 
+        } 
+        catch 
+        { 
+            try 
+            { 
+                serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIE"); 
+            } 
+            catch 
+            { 
+                try { serieReal = await _sdk.LeerDatoDocumentoAsync("cSerie"); } catch { /* mantener serie del request */ }
+            }
+        }
+
+        // 6. Timbrar (emitir) el documento con el CSD provisto en la petición o configuración
         bool timbrado = false;
+        TimbradoResult? datosFiscales = null;
+
         if (request.AutoTimbrar)
         {
-            // El folio lo asigna CONTPAQi secuencialmente. 
-            // El SDK devuelve el idDocumento; para EmitirDocumento necesitamos el folio con el que quedó.
-            // Usamos el idDocumento como folio aproximado ya que el SDK siempre incrementa el folio.
-            // En producción, leer el campo FOLIO con fLeeDatoDocumento antes de emitir.
-            await _sdk.EmitirDocumentoAsync(
-                request.CodigoConcepto,
-                request.Serie,
-                idDocumento,        // Aproximación – ajustar cuando se lea el folio del SDK
-                request.CsdPassword,
-                request.CsdEmail);
-            timbrado = true;
+            var csdPassword = request.CsdPassword;
+            if (string.IsNullOrWhiteSpace(csdPassword))
+            {
+                csdPassword = _configuration["Contpaqi:CsdPassword"];
+            }
+
+            if (string.IsNullOrWhiteSpace(csdPassword))
+                throw new ArgumentException("La contraseña del CSD es requerida para timbrar automáticamente.");
+
+            // Para el timbrado necesitamos el Folio (double)
+            if (double.TryParse(folioReal, out double folioNum))
+            {
+                var camposALeer = new[] { "CUUID", "CCADENAORIGINAL", "CSELLOEMISOR", "CSATSELLO", "CCERTIFICADOEMISOR", "CCERTIFICADOSAT", "CFECHA", "CHORA" };
+                var datosLeidos = await _sdk.EmitirDocumentoYLeerDatosAsync(
+                    request.CodigoConcepto,
+                    request.Serie,
+                    folioNum,
+                    csdPassword,
+                    request.CsdEmail,
+                    camposALeer);
+                
+                timbrado = true;
+
+                // Recuperar datos fiscales tras el timbrado de forma segura
+                datosFiscales = new TimbradoResult
+                {
+                    UUID = datosLeidos.GetValueOrDefault("CUUID", string.Empty),
+                    CadenaOriginal = datosLeidos.GetValueOrDefault("CCADENAORIGINAL", string.Empty),
+                    SelloDigitalEmisor = datosLeidos.GetValueOrDefault("CSELLOEMISOR", string.Empty),
+                    SelloDigitalSAT = datosLeidos.GetValueOrDefault("CSATSELLO", string.Empty),
+                    NoCertificadoEmisor = datosLeidos.GetValueOrDefault("CCERTIFICADOEMISOR", string.Empty),
+                    NoCertificadoSAT = datosLeidos.GetValueOrDefault("CCERTIFICADOSAT", string.Empty)
+                };
+
+                var fecha = datosLeidos.GetValueOrDefault("CFECHA", string.Empty);
+                var hora = datosLeidos.GetValueOrDefault("CHORA", string.Empty);
+                if (!string.IsNullOrWhiteSpace(fecha) || !string.IsNullOrWhiteSpace(hora))
+                {
+                    datosFiscales.FechaTimbrado = $"{fecha} {hora}".Trim();
+                }
+            }
         }
+
+        var mensajeFinal = timbrado
+            ? "Factura timbrada exitosamente."
+            : "Factura creada. No se timbró automáticamente.";
+        
+        if (!string.IsNullOrEmpty(errorFiscal))
+            mensajeFinal += $" (Aviso: {errorFiscal})";
 
         return new CreateFacturaResult
         {
             IdDocumento = idDocumento,
+            Serie       = serieReal?.Trim() ?? string.Empty,
+            Folio       = folioReal?.Trim() ?? string.Empty,
             Timbrado    = timbrado,
-            Mensaje     = timbrado
-                ? "Factura timbrada exitosamente."
-                : "Factura creada. No se timbró automáticamente."
+            DatosFiscales = datosFiscales,
+            Mensaje     = mensajeFinal
         };
     }
 }
