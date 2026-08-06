@@ -2,6 +2,8 @@ using MediatR;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using System.ComponentModel.DataAnnotations;
+using AppComercial.Application.Common.Interfaces;
+using System.Collections.Generic;
 
 namespace AppComercial.Application.Features.Documentos;
 
@@ -64,10 +66,12 @@ public class CreateDocumentoCommand : IRequest<int>
 public class CreateDocumentoCommandHandler : IRequestHandler<CreateDocumentoCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateDocumentoCommandHandler(IContpaqiSdk sdk)
+    public CreateDocumentoCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService)
     {
         _sdk = sdk;
+        _currentUserService = currentUserService;
     }
 
     public async Task<int> Handle(CreateDocumentoCommand request, CancellationToken cancellationToken)
@@ -83,6 +87,14 @@ public class CreateDocumentoCommandHandler : IRequestHandler<CreateDocumentoComm
             aTipoCambio    = request.TipoCambio
         };
 
-        return await _sdk.CrearDocumentoAsync(nuevoDocumento);
+        var idDocumento = await _sdk.CrearDocumentoAsync(nuevoDocumento);
+
+        var usuario = _currentUserService.GetCurrentUsuario() ?? "SISTEMA";
+        await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, new Dictionary<string, string>
+        {
+            ["CTEXTOEXTRA2"] = usuario
+        });
+
+        return idDocumento;
     }
 }

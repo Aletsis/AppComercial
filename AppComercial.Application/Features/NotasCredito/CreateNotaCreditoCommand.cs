@@ -2,6 +2,8 @@ using MediatR;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using System.ComponentModel.DataAnnotations;
+using AppComercial.Application.Common.Interfaces;
+using System.Collections.Generic;
 
 namespace AppComercial.Application.Features.NotasCredito;
 
@@ -66,8 +68,13 @@ public class CreateNotaCreditoResult
 public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCreditoCommand, CreateNotaCreditoResult>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateNotaCreditoCommandHandler(IContpaqiSdk sdk) => _sdk = sdk;
+    public CreateNotaCreditoCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService)
+    {
+        _sdk = sdk;
+        _currentUserService = currentUserService;
+    }
 
     public async Task<CreateNotaCreditoResult> Handle(CreateNotaCreditoCommand request, CancellationToken cancellationToken)
     {
@@ -91,6 +98,7 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
             ["cUsoCFDI"]    = request.UsoCfdi,
             ["CMETODOPAG"]  = request.FormaPago,
             ["CCANTPARCI"]  = request.MetodoPago.ToUpper() == "PPD" ? "2" : "1",
+            ["CTEXTOEXTRA2"] = _currentUserService.GetCurrentUsuario() ?? "SISTEMA"
         };
         await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, campos);
 

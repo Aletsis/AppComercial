@@ -2,6 +2,8 @@ using MediatR;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using System.ComponentModel.DataAnnotations;
+using AppComercial.Application.Common.Interfaces;
+using System.Collections.Generic;
 
 namespace AppComercial.Application.Features.SalidasAlmacen;
 
@@ -84,10 +86,12 @@ public class CreateSalidaAlmacenResult
 public class CreateSalidaAlmacenCommandHandler : IRequestHandler<CreateSalidaAlmacenCommand, CreateSalidaAlmacenResult>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateSalidaAlmacenCommandHandler(IContpaqiSdk sdk)
+    public CreateSalidaAlmacenCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService)
     {
         _sdk = sdk;
+        _currentUserService = currentUserService;
     }
 
     public async Task<CreateSalidaAlmacenResult> Handle(CreateSalidaAlmacenCommand request, CancellationToken cancellationToken)
@@ -106,15 +110,15 @@ public class CreateSalidaAlmacenCommandHandler : IRequestHandler<CreateSalidaAlm
 
         var idDocumento = await _sdk.CrearDocumentoAsync(documento);
 
-        // Si hay observaciones, actualizar el documento para inyectarlas
+        var datosEdicion = new Dictionary<string, string>
+        {
+            ["CTEXTOEXTRA2"] = _currentUserService.GetCurrentUsuario() ?? "SISTEMA"
+        };
         if (!string.IsNullOrWhiteSpace(request.Observaciones))
         {
-            var datosEdicion = new Dictionary<string, string>
-            {
-                { "COBSERVACIONES", request.Observaciones }
-            };
-            await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, datosEdicion);
+            datosEdicion["COBSERVACIONES"] = request.Observaciones;
         }
+        await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, datosEdicion);
 
         // 2. Agregar cada partida al documento
         foreach (var partida in request.Partidas)

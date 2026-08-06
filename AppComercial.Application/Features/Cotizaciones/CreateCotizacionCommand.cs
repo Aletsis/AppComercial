@@ -2,6 +2,8 @@ using MediatR;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using System.ComponentModel.DataAnnotations;
+using AppComercial.Application.Common.Interfaces;
+using System.Collections.Generic;
 
 namespace AppComercial.Application.Features.Cotizaciones;
 
@@ -93,10 +95,12 @@ public class CotizacionPartida
 public class CreateCotizacionCommandHandler : IRequestHandler<CreateCotizacionCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateCotizacionCommandHandler(IContpaqiSdk sdk)
+    public CreateCotizacionCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService)
     {
         _sdk = sdk;
+        _currentUserService = currentUserService;
     }
 
     public async Task<int> Handle(CreateCotizacionCommand request, CancellationToken cancellationToken)
@@ -113,6 +117,12 @@ public class CreateCotizacionCommandHandler : IRequestHandler<CreateCotizacionCo
         };
 
         var idDocumento = await _sdk.CrearDocumentoAsync(documento);
+
+        var usuario = _currentUserService.GetCurrentUsuario() ?? "SISTEMA";
+        await _sdk.ActualizarDocumentoPorIdAsync(idDocumento, new Dictionary<string, string>
+        {
+            ["CTEXTOEXTRA2"] = usuario
+        });
 
         foreach (var partida in request.Partidas)
         {

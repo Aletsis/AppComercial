@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations;
 using AppComercial.Application.DTOs;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
+using AppComercial.Application.Common.Interfaces;
 
 namespace AppComercial.Application.Features.Facturas;
 
@@ -67,11 +68,13 @@ public class CreateFacturaCommandHandler : IRequestHandler<CreateFacturaCommand,
 {
     private readonly IContpaqiSdk _sdk;
     private readonly IConfiguration _configuration;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateFacturaCommandHandler(IContpaqiSdk sdk, IConfiguration configuration)
+    public CreateFacturaCommandHandler(IContpaqiSdk sdk, IConfiguration configuration, ICurrentUserService currentUserService)
     {
         _sdk = sdk;
         _configuration = configuration;
+        _currentUserService = currentUserService;
     }
 
     public async Task<CreateFacturaResult> Handle(CreateFacturaCommand request, CancellationToken cancellationToken)
@@ -97,6 +100,7 @@ public class CreateFacturaCommandHandler : IRequestHandler<CreateFacturaCommand,
             ["cUsoCFDI"]    = request.UsoCfdi,
             ["CMETODOPAG"]  = request.FormaPago,
             ["CCANTPARCI"]  = request.MetodoPago.ToUpper() == "PPD" ? "2" : "1",
+            ["CTEXTOEXTRA2"] = _currentUserService.GetCurrentUsuario() ?? "SISTEMA"
         };
         if (!string.IsNullOrEmpty(request.CodigoAgente))
             camposCfdi["CCODIGOAGENTE"] = request.CodigoAgente;
