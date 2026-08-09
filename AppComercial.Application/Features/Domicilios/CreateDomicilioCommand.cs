@@ -34,11 +34,10 @@ public class CreateDomicilioCommand : IRequest<int>
     public int TipoDireccion { get; set; } = 0;
 
     /// <summary>
-    /// Nombre de la calle. Requerido. Máximo 60 caracteres.
+    /// Nombre de la calle. Opcional. Máximo 60 caracteres.
     /// Ejemplo: "Av. Insurgentes Sur"
     /// </summary>
-    [Required(ErrorMessage = "La calle es requerida.")]
-    [StringLength(60, MinimumLength = 1, ErrorMessage = "La calle debe tener entre 1 y 60 caracteres.")]
+    [StringLength(60, ErrorMessage = "La calle no puede exceder 60 caracteres.")]
     public string Calle { get; set; } = string.Empty;
 
     /// <summary>
@@ -107,7 +106,6 @@ public class CreateDomicilioCommand : IRequest<int>
     /// Ejemplo: "contacto@empresa.com"
     /// </summary>
     [StringLength(60, ErrorMessage = "El email no puede exceder 60 caracteres.")]
-    [EmailAddress(ErrorMessage = "El email no tiene un formato válido.")]
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
@@ -129,25 +127,27 @@ public class CreateDomicilioCommandHandler : IRequestHandler<CreateDomicilioComm
 
     public async Task<int> Handle(CreateDomicilioCommand request, CancellationToken cancellationToken)
     {
+        var calle = string.IsNullOrWhiteSpace(request.Calle) ? "Conocido" : request.Calle.Trim();
+
         var nuevaDireccion = new tDireccion
         {
-            cCodCatalogo    = request.CodigoCatalogo,
+            cCodCatalogo    = request.CodigoCatalogo ?? string.Empty,
             cTipoCatalogo   = request.TipoCatalogo,
             cTipoDireccion  = request.TipoDireccion,
-            cNombreCalle    = request.Calle,
-            cNumeroExterior = request.NumeroExterior,
-            cNumeroInterior = request.NumeroInterior,
-            cColonia        = request.Colonia,
-            cCodigoPostal   = request.CodigoPostal,
-            cCiudad         = request.Ciudad,
-            cEstado         = request.Estado,
-            cPais           = request.Pais,
-            cTelefono1      = request.Telefono1,
-            cTelefono2      = request.Telefono2,
+            cNombreCalle    = calle,
+            cNumeroExterior = request.NumeroExterior ?? string.Empty,
+            cNumeroInterior = request.NumeroInterior ?? string.Empty,
+            cColonia        = request.Colonia ?? string.Empty,
+            cCodigoPostal   = request.CodigoPostal ?? string.Empty,
+            cCiudad         = request.Ciudad ?? string.Empty,
+            cEstado         = request.Estado ?? string.Empty,
+            cPais           = string.IsNullOrWhiteSpace(request.Pais) ? "México" : request.Pais,
+            cTelefono1      = request.Telefono1 ?? string.Empty,
+            cTelefono2      = request.Telefono2 ?? string.Empty,
             cTelefono3      = string.Empty,
             cTelefono4      = string.Empty,
-            cEmail          = request.Email,
-            cDireccionWeb   = request.DireccionWeb,
+            cEmail          = request.Email ?? string.Empty,
+            cDireccionWeb   = request.DireccionWeb ?? string.Empty,
             cTextoExtra     = string.Empty
         };
 

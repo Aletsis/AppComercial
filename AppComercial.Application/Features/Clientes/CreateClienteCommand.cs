@@ -29,17 +29,29 @@ public class CreateClienteCommandHandler : IRequestHandler<CreateClienteCommand,
 
     public async Task<int> Handle(CreateClienteCommand request, CancellationToken cancellationToken)
     {
+        var codigo = (request.Codigo ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(codigo))
+            throw new ArgumentException("El código del cliente es requerido.");
+
+        var razonSocial = (request.RazonSocial ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(razonSocial))
+            throw new ArgumentException("La razón social del cliente es requerida.");
+
+        var rfc = (request.RFC ?? string.Empty).Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(rfc))
+            rfc = "XAXX010101000";
+
         // Validar si el código ya existe
-        var existe = await _context.Clientes.AnyAsync(c => c.CCODIGOCLIENTE == request.Codigo, cancellationToken);
+        var existe = await _context.Clientes.AnyAsync(c => c.CCODIGOCLIENTE == codigo, cancellationToken);
         if (existe)
-            throw new Exception($"El código de cliente '{request.Codigo}' ya existe en CONTPAQi.");
+            throw new Exception($"El código de cliente '{codigo}' ya existe en CONTPAQi.");
 
         var nuevoClienteParams = new tCteProv
         {
-            cCodigoCliente = request.Codigo,
-            cRazonSocial = request.RazonSocial,
-            cRFC = request.RFC,
-            cTipoCliente = request.TipoCliente
+            cCodigoCliente = codigo,
+            cRazonSocial = razonSocial,
+            cRFC = rfc,
+            cTipoCliente = request.TipoCliente == 0 ? 1 : request.TipoCliente
         };
 
         var nuevoId = await _sdk.CrearClienteAsync(nuevoClienteParams);

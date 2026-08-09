@@ -25,23 +25,36 @@ public class UpdateClienteCommandHandler : IRequestHandler<UpdateClienteCommand,
 
     public async Task<int> Handle(UpdateClienteCommand request, CancellationToken cancellationToken)
     {
+        var codigo = (request.Codigo ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(codigo))
+            throw new ArgumentException("El código del cliente es requerido.");
+
         var actualizarClienteParams = new Dictionary<string, string>();
 
         if (request.RazonSocial != null)
-            actualizarClienteParams["CRAZONSOCIAL"] = request.RazonSocial;
+        {
+            var razonSocial = request.RazonSocial.Trim();
+            if (razonSocial.Length > SdkConstantes.kLongNombre - 1)
+                razonSocial = razonSocial.Substring(0, SdkConstantes.kLongNombre - 1);
+            actualizarClienteParams["CRAZONSOCIAL"] = razonSocial;
+        }
             
         if (request.RFC != null)
-            actualizarClienteParams["CRFC"] = request.RFC;
-
-        // Tipo de cliente no se suele actualizar una vez creado, pero si es necesario:
-        // actualizarClienteParams["CTIPOCLIENTE"] = request.TipoCliente.ToString();
+        {
+            var rfc = request.RFC.Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(rfc))
+                rfc = "XAXX010101000";
+            if (rfc.Length > SdkConstantes.kLongRFC - 1)
+                rfc = rfc.Substring(0, SdkConstantes.kLongRFC - 1);
+            actualizarClienteParams["CRFC"] = rfc;
+        }
 
         if (actualizarClienteParams.Count == 0)
         {
             throw new ArgumentException("No se proporcionaron datos para actualizar.");
         }
 
-        var result = await _sdk.ActualizarClienteAsync(request.Codigo, actualizarClienteParams);
+        var result = await _sdk.ActualizarClienteAsync(codigo, actualizarClienteParams);
         return result;
     }
 }

@@ -278,17 +278,54 @@ public class ContpaqiSdk : IContpaqiSdk
         {
             int nuevoId = 0;
 
-            // Asignamos valores default requeridos por el SDK interno si vienen vacíos
-            cliente.cFechaAlta = string.IsNullOrEmpty(cliente.cFechaAlta) ? DateTime.Now.ToString("MM/dd/yyyy") : cliente.cFechaAlta;
-            if (string.IsNullOrEmpty(cliente.cNombreMoneda)) cliente.cNombreMoneda = "Peso Mexicano";
+            // Asignar valores por defecto y asegurar que ningún string sea nulo (evita SEHException en P/Invoke)
+            cliente.cCodigoCliente = (cliente.cCodigoCliente ?? "").Trim();
+            if (cliente.cCodigoCliente.Length > SdkConstantes.kLongCodigo - 1)
+                cliente.cCodigoCliente = cliente.cCodigoCliente.Substring(0, SdkConstantes.kLongCodigo - 1);
+
+            cliente.cRazonSocial = (cliente.cRazonSocial ?? "").Trim();
+            if (cliente.cRazonSocial.Length > SdkConstantes.kLongNombre - 1)
+                cliente.cRazonSocial = cliente.cRazonSocial.Substring(0, SdkConstantes.kLongNombre - 1);
+
+            var rfc = (cliente.cRFC ?? "").Trim().ToUpperInvariant();
+            cliente.cRFC = string.IsNullOrWhiteSpace(rfc) ? "XAXX010101000" : rfc;
+            if (cliente.cRFC.Length > SdkConstantes.kLongRFC - 1)
+                cliente.cRFC = cliente.cRFC.Substring(0, SdkConstantes.kLongRFC - 1);
+
+            cliente.cFechaAlta = string.IsNullOrWhiteSpace(cliente.cFechaAlta) ? DateTime.Now.ToString("MM/dd/yyyy") : cliente.cFechaAlta;
+            cliente.cCURP = cliente.cCURP ?? "";
+            cliente.cDenComercial = cliente.cDenComercial ?? "";
+            cliente.cRepLegal = cliente.cRepLegal ?? "";
+            cliente.cNombreMoneda = string.IsNullOrWhiteSpace(cliente.cNombreMoneda) ? "Peso Mexicano" : cliente.cNombreMoneda;
+            cliente.cCodigoValorClasificacionCliente1 = cliente.cCodigoValorClasificacionCliente1 ?? "";
+            cliente.cCodigoValorClasificacionCliente2 = cliente.cCodigoValorClasificacionCliente2 ?? "";
+            cliente.cCodigoValorClasificacionCliente3 = cliente.cCodigoValorClasificacionCliente3 ?? "";
+            cliente.cCodigoValorClasificacionCliente4 = cliente.cCodigoValorClasificacionCliente4 ?? "";
+            cliente.cCodigoValorClasificacionCliente5 = cliente.cCodigoValorClasificacionCliente5 ?? "";
+            cliente.cCodigoValorClasificacionCliente6 = cliente.cCodigoValorClasificacionCliente6 ?? "";
+            cliente.cFechaBaja = cliente.cFechaBaja ?? "";
+            cliente.cFechaUltimaRevision = cliente.cFechaUltimaRevision ?? "";
+            cliente.cMensajeria = cliente.cMensajeria ?? "";
+            cliente.cCuentaMensajeria = cliente.cCuentaMensajeria ?? "";
+            cliente.cCodigoAlmacen = cliente.cCodigoAlmacen ?? "";
+            cliente.cCodigoAgenteVenta = cliente.cCodigoAgenteVenta ?? "";
+            cliente.cCodigoAgenteCobro = cliente.cCodigoAgenteCobro ?? "";
+            cliente.cCodigoValorClasificacionProveedor1 = cliente.cCodigoValorClasificacionProveedor1 ?? "";
+            cliente.cCodigoValorClasificacionProveedor2 = cliente.cCodigoValorClasificacionProveedor2 ?? "";
+            cliente.cCodigoValorClasificacionProveedor3 = cliente.cCodigoValorClasificacionProveedor3 ?? "";
+            cliente.cCodigoValorClasificacionProveedor4 = cliente.cCodigoValorClasificacionProveedor4 ?? "";
+            cliente.cCodigoValorClasificacionProveedor5 = cliente.cCodigoValorClasificacionProveedor5 ?? "";
+            cliente.cCodigoValorClasificacionProveedor6 = cliente.cCodigoValorClasificacionProveedor6 ?? "";
+            cliente.cTextoExtra1 = cliente.cTextoExtra1 ?? "";
+            cliente.cTextoExtra2 = cliente.cTextoExtra2 ?? "";
+            cliente.cTextoExtra3 = cliente.cTextoExtra3 ?? "";
+
+            if (cliente.cTipoCliente == 0) cliente.cTipoCliente = 1;
             if (cliente.cBanVentaCredito == 0) cliente.cBanVentaCredito = 1;
             if (cliente.cEstatus == 0) cliente.cEstatus = 1;
 
             var result = fAltaCteProv(ref nuevoId, ref cliente);
-            if (result != 0)
-            {
-                throw new Exception($"Error al crear cliente en SDK. Código: {result}");
-            }
+            LanzarExcepcionErrorSDK(result, "Error al crear cliente en SDK.");
 
             return nuevoId;
         }
@@ -313,33 +350,11 @@ public class ContpaqiSdk : IContpaqiSdk
     [DllImport("MGWServicios.dll", EntryPoint = "fGuardaCteProv", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fGuardaCteProv();
 
-    public async Task<int> ActualizarClienteAsync(string codigo, Dictionary<string, string> datos)
-    {
-        await _sdkSemaphore.WaitAsync();
-        try
-        {
-            var result = fBuscaCteProv(codigo);
-            if (result != 0) throw new Exception($"Cliente no encontrado para actualizar. Código error: {result}");
+    [DllImport("MGWServicios.dll", EntryPoint = "fCancelarModificacionCteProv", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
+    private static extern int fCancelarModificacionCteProv();
 
-            result = fEditaCteProv();
-            if (result != 0) throw new Exception($"Error al iniciar edición del cliente. Código error: {result}");
-
-            foreach (var dato in datos)
-            {
-                result = fSetDatoCteProv(dato.Key, dato.Value);
-                if (result != 0) throw new Exception($"Error al setear campo {dato.Key}. Código error: {result}");
-            }
-
-            result = fGuardaCteProv();
-            LanzarExcepcionErrorSDK(result, "Error al guardar cambios de cliente/proveedor.");
-
-            return 1; // Success
-        }
-        finally
-        {
-            _sdkSemaphore.Release();
-        }
-    }
+    public Task<int> ActualizarClienteAsync(string codigo, Dictionary<string, string> datos) =>
+        EjecutarOperacionDictionaryAsync(() => fBuscaCteProv(codigo), fEditaCteProv, fSetDatoCteProv, fGuardaCteProv, datos, "Cliente", () => fCancelarModificacionCteProv());
 
     [DllImport("MGWServicios.dll", EntryPoint = "fAltaProducto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fAltaProducto(ref int aIdProducto, ref tProducto astProducto);
@@ -603,6 +618,28 @@ public class ContpaqiSdk : IContpaqiSdk
         try
         {
             int nuevoId = 0;
+
+            // Sanitizar campos no nulos para evitar SEHException en P/Invoke
+            direccion.cCodCatalogo = (direccion.cCodCatalogo ?? "").Trim();
+            direccion.cNombreCalle = string.IsNullOrWhiteSpace(direccion.cNombreCalle) ? "Conocido" : direccion.cNombreCalle.Trim();
+            if (direccion.cNombreCalle.Length > SdkConstantes.kLongNombre - 1)
+                direccion.cNombreCalle = direccion.cNombreCalle.Substring(0, SdkConstantes.kLongNombre - 1);
+
+            direccion.cNumeroExterior = direccion.cNumeroExterior ?? "";
+            direccion.cNumeroInterior = direccion.cNumeroInterior ?? "";
+            direccion.cColonia = direccion.cColonia ?? "";
+            direccion.cCodigoPostal = direccion.cCodigoPostal ?? "";
+            direccion.cTelefono1 = direccion.cTelefono1 ?? "";
+            direccion.cTelefono2 = direccion.cTelefono2 ?? "";
+            direccion.cTelefono3 = direccion.cTelefono3 ?? "";
+            direccion.cTelefono4 = direccion.cTelefono4 ?? "";
+            direccion.cEmail = direccion.cEmail ?? "";
+            direccion.cDireccionWeb = direccion.cDireccionWeb ?? "";
+            direccion.cCiudad = direccion.cCiudad ?? "";
+            direccion.cEstado = direccion.cEstado ?? "";
+            direccion.cPais = string.IsNullOrWhiteSpace(direccion.cPais) ? "México" : direccion.cPais;
+            direccion.cTextoExtra = direccion.cTextoExtra ?? "";
+
             var result = fAltaDireccion(ref nuevoId, ref direccion);
             LanzarExcepcionErrorSDK(result, "Error al crear dirección en SDK.");
             return nuevoId;

@@ -21,7 +21,7 @@ public class UpdateDomicilioCommand : IRequest<int>
     /// <summary>
     /// Nuevo nombre de la calle. Opcional. Máximo 60 caracteres.
     /// </summary>
-    [StringLength(60, MinimumLength = 1, ErrorMessage = "La calle debe tener entre 1 y 60 caracteres.")]
+    [StringLength(60, ErrorMessage = "La calle no puede exceder 60 caracteres.")]
     public string? Calle { get; set; }
 
     /// <summary>
@@ -82,7 +82,6 @@ public class UpdateDomicilioCommand : IRequest<int>
     /// Nuevo correo electrónico de contacto. Opcional. Máximo 60 caracteres.
     /// </summary>
     [StringLength(60, ErrorMessage = "El email no puede exceder 60 caracteres.")]
-    [EmailAddress(ErrorMessage = "El email no tiene un formato válido.")]
     public string? Email { get; set; }
 
     /// <summary>
