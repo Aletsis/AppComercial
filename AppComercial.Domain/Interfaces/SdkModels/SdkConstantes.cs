@@ -16,4 +16,8 @@ public static class SdkConstantes
     public const int kLongNombreProducto = 256;
     public const int kLongSerie = 12;
     public const int kLongReferencia = 21;
+    public const int kLongCodigoPostal = 7;
+    public const int kLongNumeroExtInt = 7;
+    public const int kLongTelefono = 16;
+    public const int kLongEmailWeb = 51;
 }

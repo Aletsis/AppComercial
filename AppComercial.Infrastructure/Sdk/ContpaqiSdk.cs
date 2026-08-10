@@ -619,26 +619,70 @@ public class ContpaqiSdk : IContpaqiSdk
         {
             int nuevoId = 0;
 
-            // Sanitizar campos no nulos para evitar SEHException en P/Invoke
+            // Sanitizar campos no nulos y truncar según límites del SDK para evitar corrupción de memoria en P/Invoke
             direccion.cCodCatalogo = (direccion.cCodCatalogo ?? "").Trim();
-            direccion.cNombreCalle = string.IsNullOrWhiteSpace(direccion.cNombreCalle) ? "Conocido" : direccion.cNombreCalle.Trim();
-            if (direccion.cNombreCalle.Length > SdkConstantes.kLongNombre - 1)
-                direccion.cNombreCalle = direccion.cNombreCalle.Substring(0, SdkConstantes.kLongNombre - 1);
+            if (direccion.cCodCatalogo.Length > SdkConstantes.kLongCodigo - 1)
+                direccion.cCodCatalogo = direccion.cCodCatalogo.Substring(0, SdkConstantes.kLongCodigo - 1);
 
-            direccion.cNumeroExterior = direccion.cNumeroExterior ?? "";
-            direccion.cNumeroInterior = direccion.cNumeroInterior ?? "";
-            direccion.cColonia = direccion.cColonia ?? "";
-            direccion.cCodigoPostal = direccion.cCodigoPostal ?? "";
-            direccion.cTelefono1 = direccion.cTelefono1 ?? "";
-            direccion.cTelefono2 = direccion.cTelefono2 ?? "";
-            direccion.cTelefono3 = direccion.cTelefono3 ?? "";
-            direccion.cTelefono4 = direccion.cTelefono4 ?? "";
-            direccion.cEmail = direccion.cEmail ?? "";
-            direccion.cDireccionWeb = direccion.cDireccionWeb ?? "";
-            direccion.cCiudad = direccion.cCiudad ?? "";
-            direccion.cEstado = direccion.cEstado ?? "";
-            direccion.cPais = string.IsNullOrWhiteSpace(direccion.cPais) ? "México" : direccion.cPais;
-            direccion.cTextoExtra = direccion.cTextoExtra ?? "";
+            direccion.cNombreCalle = string.IsNullOrWhiteSpace(direccion.cNombreCalle) ? "Conocido" : direccion.cNombreCalle.Trim();
+            if (direccion.cNombreCalle.Length > SdkConstantes.kLongDescripcion - 1)
+                direccion.cNombreCalle = direccion.cNombreCalle.Substring(0, SdkConstantes.kLongDescripcion - 1);
+
+            direccion.cNumeroExterior = (direccion.cNumeroExterior ?? "").Trim();
+            if (direccion.cNumeroExterior.Length > SdkConstantes.kLongNumeroExtInt - 1)
+                direccion.cNumeroExterior = direccion.cNumeroExterior.Substring(0, SdkConstantes.kLongNumeroExtInt - 1);
+
+            direccion.cNumeroInterior = (direccion.cNumeroInterior ?? "").Trim();
+            if (direccion.cNumeroInterior.Length > SdkConstantes.kLongNumeroExtInt - 1)
+                direccion.cNumeroInterior = direccion.cNumeroInterior.Substring(0, SdkConstantes.kLongNumeroExtInt - 1);
+
+            direccion.cColonia = (direccion.cColonia ?? "").Trim();
+            if (direccion.cColonia.Length > SdkConstantes.kLongDescripcion - 1)
+                direccion.cColonia = direccion.cColonia.Substring(0, SdkConstantes.kLongDescripcion - 1);
+
+            direccion.cCodigoPostal = (direccion.cCodigoPostal ?? "").Trim();
+            if (direccion.cCodigoPostal.Length > SdkConstantes.kLongCodigoPostal - 1)
+                direccion.cCodigoPostal = direccion.cCodigoPostal.Substring(0, SdkConstantes.kLongCodigoPostal - 1);
+
+            direccion.cTelefono1 = (direccion.cTelefono1 ?? "").Trim();
+            if (direccion.cTelefono1.Length > SdkConstantes.kLongTelefono - 1)
+                direccion.cTelefono1 = direccion.cTelefono1.Substring(0, SdkConstantes.kLongTelefono - 1);
+
+            direccion.cTelefono2 = (direccion.cTelefono2 ?? "").Trim();
+            if (direccion.cTelefono2.Length > SdkConstantes.kLongTelefono - 1)
+                direccion.cTelefono2 = direccion.cTelefono2.Substring(0, SdkConstantes.kLongTelefono - 1);
+
+            direccion.cTelefono3 = (direccion.cTelefono3 ?? "").Trim();
+            if (direccion.cTelefono3.Length > SdkConstantes.kLongTelefono - 1)
+                direccion.cTelefono3 = direccion.cTelefono3.Substring(0, SdkConstantes.kLongTelefono - 1);
+
+            direccion.cTelefono4 = (direccion.cTelefono4 ?? "").Trim();
+            if (direccion.cTelefono4.Length > SdkConstantes.kLongTelefono - 1)
+                direccion.cTelefono4 = direccion.cTelefono4.Substring(0, SdkConstantes.kLongTelefono - 1);
+
+            direccion.cEmail = (direccion.cEmail ?? "").Trim();
+            if (direccion.cEmail.Length > SdkConstantes.kLongEmailWeb - 1)
+                direccion.cEmail = direccion.cEmail.Substring(0, SdkConstantes.kLongEmailWeb - 1);
+
+            direccion.cDireccionWeb = (direccion.cDireccionWeb ?? "").Trim();
+            if (direccion.cDireccionWeb.Length > SdkConstantes.kLongEmailWeb - 1)
+                direccion.cDireccionWeb = direccion.cDireccionWeb.Substring(0, SdkConstantes.kLongEmailWeb - 1);
+
+            direccion.cCiudad = (direccion.cCiudad ?? "").Trim();
+            if (direccion.cCiudad.Length > SdkConstantes.kLongDescripcion - 1)
+                direccion.cCiudad = direccion.cCiudad.Substring(0, SdkConstantes.kLongDescripcion - 1);
+
+            direccion.cEstado = (direccion.cEstado ?? "").Trim();
+            if (direccion.cEstado.Length > SdkConstantes.kLongDescripcion - 1)
+                direccion.cEstado = direccion.cEstado.Substring(0, SdkConstantes.kLongDescripcion - 1);
+
+            direccion.cPais = string.IsNullOrWhiteSpace(direccion.cPais) ? "México" : direccion.cPais.Trim();
+            if (direccion.cPais.Length > SdkConstantes.kLongDescripcion - 1)
+                direccion.cPais = direccion.cPais.Substring(0, SdkConstantes.kLongDescripcion - 1);
+
+            direccion.cTextoExtra = (direccion.cTextoExtra ?? "").Trim();
+            if (direccion.cTextoExtra.Length > SdkConstantes.kLongTextoExtra - 1)
+                direccion.cTextoExtra = direccion.cTextoExtra.Substring(0, SdkConstantes.kLongTextoExtra - 1);
 
             var result = fAltaDireccion(ref nuevoId, ref direccion);
             LanzarExcepcionErrorSDK(result, "Error al crear dirección en SDK.");
