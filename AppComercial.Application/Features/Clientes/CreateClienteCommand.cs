@@ -11,6 +11,8 @@ public class CreateClienteCommand : IRequest<int>
     public string Codigo { get; set; } = string.Empty;
     public string RazonSocial { get; set; } = string.Empty;
     public string RFC { get; set; } = string.Empty;
+    public string? RegimenFiscal { get; set; }
+    public string? UsoCFDI { get; set; }
     
     [System.Text.Json.Serialization.JsonIgnore]
     public int TipoCliente { get; set; } = 1; // 1 = Cliente
@@ -55,6 +57,28 @@ public class CreateClienteCommandHandler : IRequestHandler<CreateClienteCommand,
         };
 
         var nuevoId = await _sdk.CrearClienteAsync(nuevoClienteParams);
+
+        if (!string.IsNullOrWhiteSpace(request.RegimenFiscal) || !string.IsNullOrWhiteSpace(request.UsoCFDI))
+        {
+            var updateParams = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(request.RegimenFiscal))
+                updateParams["CREGIMFISC"] = request.RegimenFiscal.Trim();
+            if (!string.IsNullOrWhiteSpace(request.UsoCFDI))
+                updateParams["CUSOCFDI"] = request.UsoCFDI.Trim();
+
+            if (updateParams.Count > 0)
+            {
+                try
+                {
+                    await _sdk.ActualizarClienteAsync(codigo, updateParams);
+                }
+                catch
+                {
+                    // No bloquear creación si el esquema no soporta los campos o falla el set
+                }
+            }
+        }
+
         return nuevoId;
     }
 }

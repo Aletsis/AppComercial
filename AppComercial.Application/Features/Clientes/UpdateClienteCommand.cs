@@ -9,6 +9,8 @@ public class UpdateClienteCommand : IRequest<int>
     public string Codigo { get; set; } = string.Empty;
     public string? RazonSocial { get; set; }
     public string? RFC { get; set; }
+    public string? RegimenFiscal { get; set; }
+    public string? UsoCFDI { get; set; }
     
     [System.Text.Json.Serialization.JsonIgnore]
     public int TipoCliente { get; set; } = 1; // 1 = Cliente
@@ -47,6 +49,16 @@ public class UpdateClienteCommandHandler : IRequestHandler<UpdateClienteCommand,
             if (rfc.Length > SdkConstantes.kLongRFC - 1)
                 rfc = rfc.Substring(0, SdkConstantes.kLongRFC - 1);
             actualizarClienteParams["CRFC"] = rfc;
+        }
+
+        if (request.RegimenFiscal != null)
+        {
+            actualizarClienteParams["CREGIMFISC"] = request.RegimenFiscal.Trim();
+        }
+
+        if (request.UsoCFDI != null)
+        {
+            actualizarClienteParams["CUSOCFDI"] = request.UsoCFDI.Trim();
         }
 
         if (actualizarClienteParams.Count == 0)
