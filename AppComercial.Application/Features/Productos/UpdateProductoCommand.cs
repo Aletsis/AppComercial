@@ -176,9 +176,10 @@ public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoComman
             else
             {
                 var val = await _context.ClasificacionesValores
-                    .FirstOrDefaultAsync(v => v.ClasificacionId == 25 && v.CodigoValorClasificacion == request.Clasificacion1, cancellationToken);
+                    .FirstOrDefaultAsync(v => v.ClasificacionId == 25 && 
+                        (v.CodigoValorClasificacion == request.Clasificacion1 || v.ValorClasificacion == request.Clasificacion1), cancellationToken);
                 if (val != null) datos["CIDVALORCLASIFICACION1"] = val.Id.ToString();
-                else throw new Exception($"El Código de Clasificación 1 '{request.Clasificacion1}' no existe.");
+                else datos["CIDVALORCLASIFICACION1"] = "0";
             }
         }
 
@@ -189,9 +190,10 @@ public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoComman
             else
             {
                 var val = await _context.ClasificacionesValores
-                    .FirstOrDefaultAsync(v => v.ClasificacionId == 26 && v.CodigoValorClasificacion == request.Clasificacion2, cancellationToken);
+                    .FirstOrDefaultAsync(v => v.ClasificacionId == 26 && 
+                        (v.CodigoValorClasificacion == request.Clasificacion2 || v.ValorClasificacion == request.Clasificacion2), cancellationToken);
                 if (val != null) datos["CIDVALORCLASIFICACION2"] = val.Id.ToString();
-                else throw new Exception($"El Código de Clasificación 2 '{request.Clasificacion2}' no existe.");
+                else datos["CIDVALORCLASIFICACION2"] = "0";
             }
         }
 
@@ -202,19 +204,20 @@ public class UpdateProductoCommandHandler : IRequestHandler<UpdateProductoComman
             else
             {
                 var val = await _context.ClasificacionesValores
-                    .FirstOrDefaultAsync(v => v.ClasificacionId == 29 && v.CodigoValorClasificacion == request.Clasificacion5, cancellationToken);
+                    .FirstOrDefaultAsync(v => v.ClasificacionId == 29 && 
+                        (v.CodigoValorClasificacion == request.Clasificacion5 || v.ValorClasificacion == request.Clasificacion5), cancellationToken);
                 if (val != null) datos["CIDVALORCLASIFICACION5"] = val.Id.ToString();
-                else throw new Exception($"El Código de Clasificación 5 '{request.Clasificacion5}' no existe.");
+                else datos["CIDVALORCLASIFICACION5"] = "0";
             }
         }
 
         if (!string.IsNullOrWhiteSpace(request.CodigoSat))
             datos["CCLAVESAT"] = request.CodigoSat;
 
-        if (request.IdUnidadXml.HasValue)
+        if (request.IdUnidadXml.HasValue && request.IdUnidadXml.Value > 0)
             datos["CIDUNIXML"] = request.IdUnidadXml.Value.ToString();
 
-        if (request.IdUnidadBase.HasValue)
+        if (request.IdUnidadBase.HasValue && request.IdUnidadBase.Value > 0)
         {
             var unidad = await _context.UnidadesMedidaPeso
                 .FirstOrDefaultAsync(u => u.Id == request.IdUnidadBase.Value, cancellationToken);

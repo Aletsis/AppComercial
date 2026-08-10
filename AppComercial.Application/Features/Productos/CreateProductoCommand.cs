@@ -141,13 +141,46 @@ public class CreateProductoCommandHandler : IRequestHandler<CreateProductoComman
             .FirstOrDefaultAsync(u => u.Id == request.IdUnidadBase, cancellationToken);
 
         if (unidad == null)
-            throw new Exception($"La unidad de medida con ID {request.IdUnidadBase} no existe.");
+        {
+            // Fallback por defecto a la primera unidad de medida disponible si la solicitada no existe
+            unidad = await _context.UnidadesMedidaPeso.FirstOrDefaultAsync(cancellationToken);
+            if (unidad == null)
+                throw new Exception($"No se encontraron unidades de medida registradas en CONTPAQi.");
+        }
+
+        // Resolver códigos cortos de clasificación para evitar desbordamiento del buffer en tProducto (máx 3 caracteres)
+        string codClasif1 = "";
+        if (!string.IsNullOrWhiteSpace(request.Clasificacion1))
+        {
+            var val = await _context.ClasificacionesValores
+                .FirstOrDefaultAsync(v => v.ClasificacionId == 25 && 
+                    (v.CodigoValorClasificacion == request.Clasificacion1 || v.ValorClasificacion == request.Clasificacion1), cancellationToken);
+            if (val != null) codClasif1 = val.CodigoValorClasificacion;
+        }
+
+        string codClasif2 = "";
+        if (!string.IsNullOrWhiteSpace(request.Clasificacion2))
+        {
+            var val = await _context.ClasificacionesValores
+                .FirstOrDefaultAsync(v => v.ClasificacionId == 26 && 
+                    (v.CodigoValorClasificacion == request.Clasificacion2 || v.ValorClasificacion == request.Clasificacion2), cancellationToken);
+            if (val != null) codClasif2 = val.CodigoValorClasificacion;
+        }
+
+        string codClasif5 = "";
+        if (!string.IsNullOrWhiteSpace(request.Clasificacion5))
+        {
+            var val = await _context.ClasificacionesValores
+                .FirstOrDefaultAsync(v => v.ClasificacionId == 29 && 
+                    (v.CodigoValorClasificacion == request.Clasificacion5 || v.ValorClasificacion == request.Clasificacion5), cancellationToken);
+            if (val != null) codClasif5 = val.CodigoValorClasificacion;
+        }
 
         var nuevoProducto = new tProducto
         {
             cCodigoProducto          = request.Codigo,
             cNombreProducto          = request.Nombre,
-            cDescripcionProducto     = request.Descripcion,
+            cDescripcionProducto     = request.Descripcion ?? "",
             cTipoProducto            = request.TipoProducto,
             cControlExistencia       = request.ControlExistencia,
             cCodigoUnidadBase        = unidad.NombreUnidad,
@@ -161,11 +194,11 @@ public class CreateProductoCommandHandler : IRequestHandler<CreateProductoComman
             cNombreCaracteristica1   = "",
             cNombreCaracteristica2   = "",
             cNombreCaracteristica3   = "",
-            cCodigoValorClasificacion1 = string.IsNullOrWhiteSpace(request.Clasificacion1) ? "" : request.Clasificacion1,
-            cCodigoValorClasificacion2 = string.IsNullOrWhiteSpace(request.Clasificacion2) ? "" : request.Clasificacion2,
+            cCodigoValorClasificacion1 = codClasif1,
+            cCodigoValorClasificacion2 = codClasif2,
             cCodigoValorClasificacion3 = "",
             cCodigoValorClasificacion4 = "",
-            cCodigoValorClasificacion5 = string.IsNullOrWhiteSpace(request.Clasificacion5) ? "" : request.Clasificacion5,
+            cCodigoValorClasificacion5 = codClasif5,
             cCodigoValorClasificacion6 = "",
             cTextoExtra1             = "",
             cTextoExtra2             = "",
@@ -178,10 +211,10 @@ public class CreateProductoCommandHandler : IRequestHandler<CreateProductoComman
         if (!string.IsNullOrWhiteSpace(request.CodigoSat))
             datosExtra["CCLAVESAT"] = request.CodigoSat;
 
-        if (request.IdUnidadXml.HasValue)
+        if (request.IdUnidadXml.HasValue && request.IdUnidadXml.Value > 0)
             datosExtra["CIDUNIXML"] = request.IdUnidadXml.Value.ToString();
 
-        if (request.CodigoAlterno != null)
+        if (!string.IsNullOrWhiteSpace(request.CodigoAlterno))
             datosExtra["CCODALTERN"] = request.CodigoAlterno;
 
         if (datosExtra.Count > 0)

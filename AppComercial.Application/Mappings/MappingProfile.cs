@@ -23,6 +23,7 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.IdUnidadXml, opt => opt.MapFrom(src => src.CIDUNIXML))
             .ForMember(dest => dest.CodigoAlterno, opt => opt.MapFrom(src => src.CCODALTERN != null ? src.CCODALTERN.Trim() : null))
             .ForMember(dest => dest.TipoProducto, opt => opt.MapFrom(src => src.CTIPOPRODUCTO))
+            .ForMember(dest => dest.ControlExistencia, opt => opt.MapFrom(src => src.CCONTROLEXISTENCIA))
             .ForMember(dest => dest.Clasificacion1Id, opt => opt.MapFrom(src => src.CIDVALORCLASIFICACION1))
             .ForMember(dest => dest.Clasificacion5Id, opt => opt.MapFrom(src => src.CIDVALORCLASIFICACION5))
             .ForMember(dest => dest.Activo, opt => opt.MapFrom(src => src.CSTATUSPRODUCTO == 1));
