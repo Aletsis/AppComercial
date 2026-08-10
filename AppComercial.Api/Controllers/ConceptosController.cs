@@ -18,11 +18,16 @@ public class ConceptosController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AdmConceptos>>> Get([FromQuery] string? codigo, [FromQuery] int? tipoDocumento)
+    public async Task<ActionResult<IEnumerable<AdmConceptos>>> Get([FromQuery] string? codigo, [FromQuery] int? tipoDocumento, [FromQuery] bool? soloActivos = true)
     {
         try
         {
-            var query = new GetConceptosQuery { Codigo = codigo, TipoDocumento = tipoDocumento };
+            var query = new GetConceptosQuery 
+            { 
+                Codigo = codigo, 
+                TipoDocumento = tipoDocumento,
+                SoloActivos = soloActivos ?? true
+            };
             var result = await _mediator.Send(query);
             return Ok(result);
         }

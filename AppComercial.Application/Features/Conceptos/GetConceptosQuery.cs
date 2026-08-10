@@ -10,6 +10,7 @@ public class GetConceptosQuery : IRequest<IEnumerable<AdmConceptos>>
 {
     public string? Codigo { get; set; }
     public int? TipoDocumento { get; set; } // Representa el tipo de documento al que pertenece (ej. Facturas, Compras, etc.)
+    public bool SoloActivos { get; set; } = true;
 }
 
 public class GetConceptosQueryHandler : IRequestHandler<GetConceptosQuery, IEnumerable<AdmConceptos>>
@@ -27,6 +28,11 @@ public class GetConceptosQueryHandler : IRequestHandler<GetConceptosQuery, IEnum
                     join a in _dbContext.Almacenes.AsNoTracking() on c.CIDALMASUM equals a.CIDALMACEN into joined
                     from al in joined.DefaultIfEmpty()
                     select new { c, CodigoAlm = al != null ? al.CCODIGOALMACEN : "" };
+
+        if (request.SoloActivos)
+        {
+            query = query.Where(x => x.c.CESTATUS == 1);
+        }
 
         if (!string.IsNullOrEmpty(request.Codigo))
         {
