@@ -65,7 +65,7 @@ public class ComprasController : ControllerBase
     /// Crea un documento de Compra completo (cabecera + partidas) en un solo request.
     /// </summary>
     [HttpPost]
-    public async Task<ActionResult<int>> Post([FromBody] CreateCompraCommand command)
+    public async Task<ActionResult<CreateCompraResult>> Post([FromBody] CreateCompraCommand command)
     {
         try
         {

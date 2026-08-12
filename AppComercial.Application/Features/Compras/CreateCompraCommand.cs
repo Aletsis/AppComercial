@@ -11,7 +11,7 @@ namespace AppComercial.Application.Features.Compras;
 /// Crea un documento de Compra completo (cabecera + partidas) en CONTPAQi Comercial.
 /// El código de concepto debe ser uno configurado con naturaleza Compra (CNATURALEZA = 2).
 /// </summary>
-public class CreateCompraCommand : IRequest<int>
+public class CreateCompraCommand : IRequest<CreateCompraResult>
 {
     /// <summary>
     /// Código del Concepto de tipo Compra configurado en CONTPAQi. Requerido.
@@ -81,6 +81,14 @@ public class CreateCompraCommand : IRequest<int>
     public List<CompraPartida> Partidas { get; set; } = new();
 }
 
+public class CreateCompraResult
+{
+    public int IdDocumento { get; set; }
+    public string CodigoConcepto { get; set; } = string.Empty;
+    public string Serie { get; set; } = string.Empty;
+    public string Folio { get; set; } = string.Empty;
+}
+
 /// <summary>
 /// Representa una línea de producto dentro de un documento de Compra.
 /// </summary>
@@ -107,7 +115,7 @@ public class CompraPartida
     public double PrecioUnitario { get; set; }
 }
 
-public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, int>
+public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, CreateCompraResult>
 {
     private readonly IContpaqiSdk _sdk;
     private readonly ICurrentUserService _currentUserService;
@@ -118,7 +126,7 @@ public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, i
         _currentUserService = currentUserService;
     }
 
-    public async Task<int> Handle(CreateCompraCommand request, CancellationToken cancellationToken)
+    public async Task<CreateCompraResult> Handle(CreateCompraCommand request, CancellationToken cancellationToken)
     {
         // 1. Crear la cabecera del documento de compra
         var documento = new tDocumento
@@ -162,6 +170,40 @@ public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, i
             await _sdk.CrearMovimientoAsync(idDocumento, movimiento);
         }
 
-        return idDocumento;
+        // 3. Leer Folio y Serie reales asignados por el SDK
+        string folioReal = request.Folio > 0 ? request.Folio.ToString() : "0";
+        string serieReal = request.Serie;
+        try 
+        { 
+            folioReal = await _sdk.LeerDatoDocumentoAsync("CFOLIO"); 
+        } 
+        catch 
+        { 
+            try { folioReal = await _sdk.LeerDatoDocumentoAsync("cFolio"); } catch { folioReal = idDocumento.ToString(); }
+        }
+
+        try 
+        { 
+            serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIEDOCUMENTO"); 
+        } 
+        catch 
+        { 
+            try 
+            { 
+                serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIE"); 
+            } 
+            catch 
+            { 
+                try { serieReal = await _sdk.LeerDatoDocumentoAsync("cSerie"); } catch { /* mantener serie del request */ }
+            }
+        }
+
+        return new CreateCompraResult
+        {
+            IdDocumento = idDocumento,
+            CodigoConcepto = request.CodigoConcepto,
+            Serie = serieReal?.Trim() ?? string.Empty,
+            Folio = folioReal?.Trim() ?? string.Empty
+        };
     }
 }

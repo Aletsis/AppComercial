@@ -54,9 +54,23 @@ public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthentic
         }
 
         // 4. Autenticación exitosa - Crear identidad del cliente
+        var userName = "ApiKeyClient";
+        if (Request.Headers.TryGetValue("X-Usuario", out var userHeader) && !string.IsNullOrWhiteSpace(userHeader))
+        {
+            userName = userHeader.ToString().Trim();
+        }
+        else if (Request.Headers.TryGetValue("X-User-Name", out var userHeader2) && !string.IsNullOrWhiteSpace(userHeader2))
+        {
+            userName = userHeader2.ToString().Trim();
+        }
+        else if (Request.Headers.TryGetValue("X-User", out var userHeader3) && !string.IsNullOrWhiteSpace(userHeader3))
+        {
+            userName = userHeader3.ToString().Trim();
+        }
+
         var claims = new[] 
         { 
-            new Claim(ClaimTypes.Name, "ApiKeyClient"),
+            new Claim(ClaimTypes.Name, userName),
             new Claim(ClaimTypes.Role, "InternalClient")
         };
         
