@@ -5,6 +5,8 @@ using System.ComponentModel.DataAnnotations;
 using AppComercial.Application.Common.Interfaces;
 using System.Collections.Generic;
 
+using AppComercial.Application.DTOs;
+
 namespace AppComercial.Application.Features.NotasCredito;
 
 /// <summary>
@@ -63,6 +65,7 @@ public class CreateNotaCreditoResult
     public bool Timbrado { get; set; }
     public bool Saldado { get; set; }
     public string? Mensaje { get; set; }
+    public TimbradoResult? DatosFiscales { get; set; }
 }
 
 public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCreditoCommand, CreateNotaCreditoResult>
@@ -126,20 +129,55 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
             await _sdk.AgregarRelacionCfdiAsync(request.UuidFacturaOrigen, request.TipoRelacionSat);
         }
 
+        // Leer Folio y Serie reales asignados por el SDK
+        string folioReal = "0";
+        try
+        {
+            folioReal = await _sdk.LeerDatoDocumentoAsync("CFOLIO");
+        }
+        catch
+        {
+            try { folioReal = await _sdk.LeerDatoDocumentoAsync("cFolio"); } catch { folioReal = idDocumento.ToString(); }
+        }
+
         // 5. Timbrar (emitir) la nota de crédito
         bool timbrado = false;
+        TimbradoResult? datosFiscales = null;
         if (request.AutoTimbrar)
         {
             if (string.IsNullOrWhiteSpace(request.CsdPassword))
                 throw new ArgumentException("La contraseña del CSD es requerida para timbrar la nota de crédito automáticamente.");
 
-            await _sdk.EmitirDocumentoAsync(
-                request.CodigoConcepto,
-                request.Serie,
-                idDocumento,
-                request.CsdPassword,
-                string.Empty);
-            timbrado = true;
+            if (double.TryParse(folioReal, out double folioNum))
+            {
+                var camposALeer = new[] { "CUUID", "CCADENAORIGINAL", "CSELLOEMISOR", "CSATSELLO", "CCERTIFICADOEMISOR", "CCERTIFICADOSAT", "CFECHA", "CHORA" };
+                var datosLeidos = await _sdk.EmitirDocumentoYLeerDatosAsync(
+                    request.CodigoConcepto,
+                    request.Serie,
+                    folioNum,
+                    request.CsdPassword,
+                    string.Empty,
+                    camposALeer);
+                
+                timbrado = true;
+
+                datosFiscales = new TimbradoResult
+                {
+                    UUID = datosLeidos.GetValueOrDefault("CUUID", string.Empty),
+                    CadenaOriginal = datosLeidos.GetValueOrDefault("CCADENAORIGINAL", string.Empty),
+                    SelloDigitalEmisor = datosLeidos.GetValueOrDefault("CSELLOEMISOR", string.Empty),
+                    SelloDigitalSAT = datosLeidos.GetValueOrDefault("CSATSELLO", string.Empty),
+                    NoCertificadoEmisor = datosLeidos.GetValueOrDefault("CCERTIFICADOEMISOR", string.Empty),
+                    NoCertificadoSAT = datosLeidos.GetValueOrDefault("CCERTIFICADOSAT", string.Empty)
+                };
+
+                var fecha = datosLeidos.GetValueOrDefault("CFECHA", string.Empty);
+                var hora = datosLeidos.GetValueOrDefault("CHORA", string.Empty);
+                if (!string.IsNullOrWhiteSpace(fecha) || !string.IsNullOrWhiteSpace(hora))
+                {
+                    datosFiscales.FechaTimbrado = $"{fecha} {hora}".Trim();
+                }
+            }
         }
 
         // 6. Saldar la factura origen en CXC para eliminar el adeudo del cliente
@@ -163,6 +201,7 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
             IdDocumento = idDocumento,
             Timbrado    = timbrado,
             Saldado     = saldado,
+            DatosFiscales = datosFiscales,
             Mensaje     = $"Nota de Crédito creada (id: {idDocumento}). Timbrada: {timbrado}. CXC Saldada: {saldado}."
         };
     }
