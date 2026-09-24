@@ -20,6 +20,8 @@
      <ImplicitUsings>enable</ImplicitUsings>
      <Nullable>enable</Nullable>
      <PlatformTarget>x86</PlatformTarget>
+     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+     <NoWarn>$(NoWarn);1591</NoWarn>
    </PropertyGroup>
  
  </Project>

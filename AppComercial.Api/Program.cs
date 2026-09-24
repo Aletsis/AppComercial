@@ -103,6 +103,14 @@ public static class ApiServer
                 Description = "Ingrese 'Bearer' [espacio] y luego su token válido."
             });
 
+            c.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+            {
+                Name = "X-Api-Key",
+                Type = SecuritySchemeType.ApiKey,
+                In = ParameterLocation.Header,
+                Description = "Ingrese la API Key en el encabezado 'X-Api-Key'."
+            });
+
             c.AddSecurityRequirement(new OpenApiSecurityRequirement
             {
                 {
@@ -111,8 +119,30 @@ public static class ApiServer
                         Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
                     },
                     Array.Empty<string>()
+                },
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "ApiKey" }
+                    },
+                    Array.Empty<string>()
                 }
             });
+
+            // Incluir comentarios XML de la API y de la capa de Aplicación
+            var xmlFileApi = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            var xmlPathApi = Path.Combine(AppContext.BaseDirectory, xmlFileApi);
+            if (File.Exists(xmlPathApi))
+            {
+                c.IncludeXmlComments(xmlPathApi);
+            }
+
+            var xmlFileApp = "AppComercial.Application.xml";
+            var xmlPathApp = Path.Combine(AppContext.BaseDirectory, xmlFileApp);
+            if (File.Exists(xmlPathApp))
+            {
+                c.IncludeXmlComments(xmlPathApp);
+            }
         });
 
         builder.Services.AddApplicationServices();
