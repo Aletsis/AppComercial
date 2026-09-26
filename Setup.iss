@@ -1,11 +1,15 @@
+#ifndef MyAppVersion
+#define MyAppVersion "1.0.0"
+#endif
+
 [Setup]
 AppName=AppComercial POS System
-AppVersion=1.0.0
+AppVersion={#MyAppVersion}
 AppPublisher=AppComercial
 DefaultDirName={pf}\AppComercial
 DefaultGroupName=AppComercial
 OutputDir=.\Releases
-OutputBaseFilename=AppComercial_Instalador_v1.0
+OutputBaseFilename=AppComercial_Instalador_v{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
