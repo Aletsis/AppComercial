@@ -40,17 +40,10 @@ jobs:
           echo "version=$CLEAN_VERSION" >> "$GITHUB_OUTPUT"
           echo "tag_name=v$CLEAN_VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Setup .NET 10 SDK (x64)
+      - name: Setup .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          architecture: 'x64'
-
-      - name: Setup .NET 10 SDK (x86)
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-          architecture: 'x86'
 
       - name: Restore Dependencies
         run: dotnet restore AppComercial.slnx

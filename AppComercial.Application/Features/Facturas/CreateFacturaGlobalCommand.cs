@@ -16,7 +16,7 @@ namespace AppComercial.Application.Features.Facturas;
 ///   <see cref="TrasladoConcepto"/> por TasaOCuota.
 ///   El handler crea UN SOLO movimiento SDK por concepto (ticket), con precio = suma de
 ///   todas las bases. El desglose por tasa se pasa vía cObservaMov, que CONTPAQi interpreta
-///   para generar múltiples <cfdi:Traslado> dentro del mismo <cfdi:Concepto>.
+///   para generar múltiples &lt;cfdi:Traslado&gt; dentro del mismo &lt;cfdi:Concepto&gt;.
 ///   Este comportamiento replica exactamente lo que hace la MacroGeneracionGlobal.txt.
 ///
 /// MODELO LEGACY DE TICKETS (retrocompatibilidad):

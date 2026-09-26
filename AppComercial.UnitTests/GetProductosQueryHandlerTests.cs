@@ -44,7 +44,7 @@ public class GetProductosQueryHandlerTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal(1, result.Items.Count());
+        Assert.Single(result.Items);
         Assert.Equal("Producto 1", result.Items.First().Nombre);
         mockRepo.Verify(r => r.GetByFiltersAsync(null, null), Times.Once);
     }
