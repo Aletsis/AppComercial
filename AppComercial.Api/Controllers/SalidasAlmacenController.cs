@@ -1,3 +1,5 @@
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 using AppComercial.Application.Features.SalidasAlmacen;
 using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
@@ -22,13 +24,15 @@ public class SalidasAlmacenController : ControllerBase
     private readonly ILogger<SalidasAlmacenController> _logger;
     private readonly IContpaqiSdk _sdk;
     private readonly IConfiguration _config;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
 
-    public SalidasAlmacenController(IMediator mediator, ILogger<SalidasAlmacenController> logger, IContpaqiSdk sdk, IConfiguration config)
+    public SalidasAlmacenController(IMediator mediator, ILogger<SalidasAlmacenController> logger, IContpaqiSdk sdk, IConfiguration config, IConceptoDocumentoValidator conceptoValidator)
     {
         _mediator = mediator;
         _logger = logger;
         _sdk = sdk;
         _config = config;
+        _conceptoValidator = conceptoValidator;
     }
 
     /// <summary>
@@ -73,6 +77,10 @@ public class SalidasAlmacenController : ControllerBase
             var result = await _mediator.Send(command);
             return Ok(result);
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             var innerMsg = ex.InnerException != null ? ex.InnerException.Message : "";
@@ -105,6 +113,10 @@ public class SalidasAlmacenController : ControllerBase
             var result = await _mediator.Send(command);
             return Ok(result);
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al actualizar la salida de almacén en el SDK: {ex.Message}");
@@ -126,12 +138,18 @@ public class SalidasAlmacenController : ControllerBase
             // Serie "-" o "none" la mapeamos a vacío (convenio de URL para series vacías)
             if (serie == "-" || serie == "none") serie = string.Empty;
 
+            await _conceptoValidator.ValidarAsync(codigoConcepto, TiposDocumento.SalidaAlmacen);
+
             _logger.LogInformation("Generando PDF para Salida: {Concepto}/{Serie}/{Folio}", codigoConcepto, serie, folio);
 
             string rutaPdf = await _sdk.GenerarPdfAsync(codigoConcepto, serie, folio, rutaEmpresa);
 
             var bytes = await System.IO.File.ReadAllBytesAsync(rutaPdf);
             return File(bytes, "application/pdf", $"{codigoConcepto}{serie}{folio}.pdf");
+        }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

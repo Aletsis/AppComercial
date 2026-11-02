@@ -6,6 +6,8 @@ using AppComercial.Application.DTOs;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using AppComercial.Application.Common.Interfaces;
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 
 namespace AppComercial.Application.Features.Facturas;
 
@@ -67,18 +69,22 @@ public class CreateFacturaResult
 public class CreateFacturaCommandHandler : IRequestHandler<CreateFacturaCommand, CreateFacturaResult>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
     private readonly IConfiguration _configuration;
     private readonly ICurrentUserService _currentUserService;
 
-    public CreateFacturaCommandHandler(IContpaqiSdk sdk, IConfiguration configuration, ICurrentUserService currentUserService)
+    public CreateFacturaCommandHandler(IContpaqiSdk sdk, IConfiguration configuration, ICurrentUserService currentUserService, IConceptoDocumentoValidator conceptoValidator)
     {
         _sdk = sdk;
         _configuration = configuration;
         _currentUserService = currentUserService;
+        _conceptoValidator = conceptoValidator;
     }
 
     public async Task<CreateFacturaResult> Handle(CreateFacturaCommand request, CancellationToken cancellationToken)
     {
+        await _conceptoValidator.ValidarAsync(request.CodigoConcepto, TiposDocumento.Factura, cancellationToken);
+
         // 1. Crear el documento cabecera
         var documento = new tDocumento
         {
@@ -137,26 +143,26 @@ public class CreateFacturaCommandHandler : IRequestHandler<CreateFacturaCommand,
         string serieReal = request.Serie;
         try 
         { 
-            folioReal = await _sdk.LeerDatoDocumentoAsync("CFOLIO"); 
+            folioReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "CFOLIO"); 
         } 
         catch 
         { 
-            try { folioReal = await _sdk.LeerDatoDocumentoAsync("cFolio"); } catch { folioReal = idDocumento.ToString(); }
+            try { folioReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "cFolio"); } catch { folioReal = idDocumento.ToString(); }
         }
 
         try 
         { 
-            serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIEDOCUMENTO"); 
+            serieReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "CSERIEDOCUMENTO"); 
         } 
         catch 
         { 
             try 
             { 
-                serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIE"); 
+                serieReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "CSERIE"); 
             } 
             catch 
             { 
-                try { serieReal = await _sdk.LeerDatoDocumentoAsync("cSerie"); } catch { /* mantener serie del request */ }
+                try { serieReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "cSerie"); } catch { /* mantener serie del request */ }
             }
         }
 

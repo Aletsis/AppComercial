@@ -1,3 +1,5 @@
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 using AppComercial.Application.Features.Facturas;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -61,6 +63,10 @@ public class FacturasController : ControllerBase
         {
             return Ok(await _mediator.Send(command));
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             // TODO: Inyectar ILogger para registro estructurado
@@ -84,6 +90,10 @@ public class FacturasController : ControllerBase
         {
             return Ok(await _mediator.Send(command));
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al crear la factura global: {ex.Message}");
@@ -105,6 +115,10 @@ public class FacturasController : ControllerBase
             command.Folio          = folio;
             return Ok(await _mediator.Send(command));
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al actualizar la factura en el SDK: {ex.Message}");
@@ -119,7 +133,12 @@ public class FacturasController : ControllerBase
     {
         try
         {
+            command.TipoDocumentoEsperado = TiposDocumento.Factura;
             return Ok(await _mediator.Send(command));
+        }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
@@ -141,7 +160,12 @@ public class FacturasController : ControllerBase
     {
         try
         {
+            command.TipoDocumentoEsperado = TiposDocumento.Factura;
             return Ok(await _mediator.Send(command));
+        }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
@@ -157,7 +181,12 @@ public class FacturasController : ControllerBase
     {
         try
         {
+            command.TipoDocumentoEsperado = TiposDocumento.Factura;
             return Ok(await _mediator.Send(command));
+        }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

@@ -1,3 +1,5 @@
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 using AppComercial.Application.Features.NotasCredito;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -61,6 +63,10 @@ public class NotasCreditoController : ControllerBase
         {
             return Ok(await _mediator.Send(command));
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al crear la nota de crédito en el SDK: {ex.Message}");
@@ -82,6 +88,10 @@ public class NotasCreditoController : ControllerBase
             command.Folio          = folio;
             return Ok(await _mediator.Send(command));
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al actualizar la nota de crédito en el SDK: {ex.Message}");
@@ -96,7 +106,12 @@ public class NotasCreditoController : ControllerBase
     {
         try
         {
+            command.TipoDocumentoEsperado = TiposDocumento.NotaCredito;
             return Ok(await _mediator.Send(command));
+        }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
@@ -112,7 +127,12 @@ public class NotasCreditoController : ControllerBase
     {
         try
         {
+            command.TipoDocumentoEsperado = TiposDocumento.NotaCredito;
             return Ok(await _mediator.Send(command));
+        }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

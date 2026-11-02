@@ -1,3 +1,5 @@
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 using AppComercial.Application.Features.Traspasos;
 using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
@@ -71,6 +73,10 @@ public class TraspasosController : ControllerBase
 
             var result = await _mediator.Send(command);
             return Ok(result);
+        }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

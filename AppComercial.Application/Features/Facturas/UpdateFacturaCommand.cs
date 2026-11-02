@@ -2,6 +2,8 @@ using MediatR;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using System.ComponentModel.DataAnnotations;
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 
 namespace AppComercial.Application.Features.Facturas;
 
@@ -70,14 +72,18 @@ public class UpdateFacturaCommand : IRequest<int>
 public class UpdateFacturaCommandHandler : IRequestHandler<UpdateFacturaCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
 
-    public UpdateFacturaCommandHandler(IContpaqiSdk sdk)
+    public UpdateFacturaCommandHandler(IContpaqiSdk sdk, IConceptoDocumentoValidator conceptoValidator)
     {
         _sdk = sdk;
+        _conceptoValidator = conceptoValidator;
     }
 
     public async Task<int> Handle(UpdateFacturaCommand request, CancellationToken cancellationToken)
     {
+        await _conceptoValidator.ValidarAsync(request.CodigoConcepto, TiposDocumento.Factura, cancellationToken);
+
         var datos = new Dictionary<string, string>();
 
         if (!string.IsNullOrWhiteSpace(request.CodigoCliente))

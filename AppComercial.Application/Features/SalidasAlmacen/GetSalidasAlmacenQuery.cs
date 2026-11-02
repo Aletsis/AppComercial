@@ -3,6 +3,7 @@ using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using AppComercial.Application.Common;
 
 namespace AppComercial.Application.Features.SalidasAlmacen;
 
@@ -30,7 +31,7 @@ public class GetSalidasAlmacenQueryHandler : IRequestHandler<GetSalidasAlmacenQu
     {
         // CIDDOCUMENTODE = 33 → Salidas de Almacén
         var conceptosSalida = await _dbContext.Conceptos
-            .Where(c => c.CIDDOCUMENTODE == 33)
+            .Where(c => c.CIDDOCUMENTODE == TiposDocumento.SalidaAlmacen)
             .Select(c => c.CIDCONCEPTODOCUMENTO)
             .ToListAsync(cancellationToken);
 

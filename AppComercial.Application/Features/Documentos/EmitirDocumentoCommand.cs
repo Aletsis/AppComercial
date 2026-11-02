@@ -6,6 +6,9 @@ using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 
+using AppComercial.Application.Common.Services;
+using System.Text.Json.Serialization;
+
 namespace AppComercial.Application.Features.Documentos;
 
 public class EmitirDocumentoCommand : IRequest<TimbradoResult>
@@ -22,21 +25,33 @@ public class EmitirDocumentoCommand : IRequest<TimbradoResult>
     public string PasswordContpaqi { get; set; } = string.Empty;
 
     public string CorreoOArchivoAdicional { get; set; } = string.Empty; // En Comercial puede separar correos por ; o ruta de visor PFD
+
+    /// <summary>
+    /// Tipo de documento (CIDDOCUMENTODE) que exige el endpoint que invoca el comando; lo asigna el controlador.
+    /// Si es null no se valida el tipo del concepto.
+    /// </summary>
+    [JsonIgnore]
+    public int? TipoDocumentoEsperado { get; set; }
 }
 
 public class EmitirDocumentoCommandHandler : IRequestHandler<EmitirDocumentoCommand, TimbradoResult>
 {
     private readonly IContpaqiSdk _sdk;
     private readonly IConfiguration _configuration;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
 
-    public EmitirDocumentoCommandHandler(IContpaqiSdk sdk, IConfiguration configuration)
+    public EmitirDocumentoCommandHandler(IContpaqiSdk sdk, IConfiguration configuration, IConceptoDocumentoValidator conceptoValidator)
     {
         _sdk = sdk;
         _configuration = configuration;
+        _conceptoValidator = conceptoValidator;
     }
 
     public async Task<TimbradoResult> Handle(EmitirDocumentoCommand request, CancellationToken cancellationToken)
     {
+        if (request.TipoDocumentoEsperado.HasValue)
+            await _conceptoValidator.ValidarAsync(request.CodigoConcepto, request.TipoDocumentoEsperado.Value, cancellationToken);
+
         var password = request.PasswordContpaqi;
         if (string.IsNullOrWhiteSpace(password))
         {

@@ -848,11 +848,13 @@ public class ContpaqiSdk : IContpaqiSdk
     [DllImport("MGWServicios.dll", EntryPoint = "fAgregaRelacionCFDI", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fAgregaRelacionCFDI(string aSelloDigital, string aUUIDRelacionado, string aTipoRelacion);
 
-    public async Task<int> AgregarRelacionCfdiAsync(string uuid, string tipoRelacion)
+    public async Task<int> AgregarRelacionCfdiAsync(int idDocumento, string uuid, string tipoRelacion)
     {
         await _sdkSemaphore.WaitAsync();
         try
         {
+            LanzarExcepcionErrorSDK(fBuscarIdDocumento(idDocumento), $"No se encontró el documento con id {idDocumento}.");
+
             int result;
             try 
             {
@@ -1007,11 +1009,13 @@ public class ContpaqiSdk : IContpaqiSdk
     [DllImport("MGWServicios.dll", EntryPoint = "fLeeDatoConceptoDocto", CharSet = CharSet.Ansi, CallingConvention = CallingConvention.StdCall)]
     private static extern int fLeeDatoConceptoDocto(string aCampo, StringBuilder aValor, int aLongitud);
 
-    public async Task<string> LeerDatoDocumentoAsync(string campo)
+    public async Task<string> LeerDatoDocumentoPorIdAsync(int idDocumento, string campo)
     {
         await _sdkSemaphore.WaitAsync();
         try
         {
+            LanzarExcepcionErrorSDK(fBuscarIdDocumento(idDocumento), $"No se encontró el documento con id {idDocumento}.");
+
             StringBuilder sb = new StringBuilder(5000); // Algunos campos como CadenaOriginal son largos
             int result = Sdk_fLeeDatoDocumento(campo ?? "", sb, 5000);
             LanzarExcepcionErrorSDK(result, $"Error al leer campo {campo} del documento");

@@ -1,3 +1,4 @@
+using AppComercial.Application.Common.Services;
 using AppComercial.Application.Features.Productos;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,8 @@ public static class DependencyInjection
 
         // Registrar FluentValidation
         services.AddValidatorsFromAssembly(typeof(GetProductosQuery).Assembly);
+
+        services.AddScoped<IConceptoDocumentoValidator, ConceptoDocumentoValidator>();
 
         return services;
     }
