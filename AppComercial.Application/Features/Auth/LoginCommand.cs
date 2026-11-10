@@ -49,10 +49,17 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
 
     public async Task<LoginResponse> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request?.Username))
+        {
+            throw new ArgumentException("El nombre de usuario es requerido.");
+        }
+
+        var normalizedUsername = request.Username.Trim();
+
         // 1. Verificar que el usuario exista en CONTPAQi Comercial (IDSISTEMA = '5')
         var usuario = await _dbContext.Usuarios
             .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.IdSistema == "5" && u.Clave != null && u.Clave.Trim() == request.Username.Trim(), cancellationToken);
+            .FirstOrDefaultAsync(u => u.IdSistema == "5" && u.Clave != null && u.Clave.Trim().ToUpper() == normalizedUsername.ToUpper(), cancellationToken);
 
         if (usuario == null)
         {

@@ -48,6 +48,10 @@ public class AuthTokensController : ControllerBase
             var result = await _mediator.Send(command);
             return Ok(result);
         }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { error = ex.Message });
