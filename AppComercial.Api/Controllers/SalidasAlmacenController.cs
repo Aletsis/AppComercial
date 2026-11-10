@@ -36,12 +36,13 @@ public class SalidasAlmacenController : ControllerBase
     }
 
     /// <summary>
-    /// Lista los documentos de Salida de Almacén, filtrados opcionalmente por concepto, serie o rango de fechas.
+    /// Lista los documentos de Salida de Almacén, filtrados opcionalmente por concepto, serie, folio o rango de fechas.
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<IEnumerable<AdmDocumentos>>> Get(
         [FromQuery] string? codigoConcepto,
         [FromQuery] string? serie,
+        [FromQuery] double? folio,
         [FromQuery] DateTime? fechaDesde,
         [FromQuery] DateTime? fechaHasta)
     {
@@ -51,6 +52,7 @@ public class SalidasAlmacenController : ControllerBase
             {
                 CodigoConcepto = codigoConcepto,
                 Serie          = serie,
+                Folio          = folio,
                 FechaDesde     = fechaDesde,
                 FechaHasta     = fechaHasta
             };

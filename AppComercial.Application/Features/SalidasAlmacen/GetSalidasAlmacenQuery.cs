@@ -14,6 +14,7 @@ public class GetSalidasAlmacenQuery : IRequest<IEnumerable<AdmDocumentos>>
 {
     public string? CodigoConcepto { get; set; }
     public string? Serie { get; set; }
+    public double? Folio { get; set; }
     public DateTime? FechaDesde { get; set; }
     public DateTime? FechaHasta { get; set; }
 }
@@ -52,6 +53,9 @@ public class GetSalidasAlmacenQueryHandler : IRequestHandler<GetSalidasAlmacenQu
 
         if (!string.IsNullOrEmpty(request.Serie))
             query = query.Where(d => d.CSERIEDOCUMENTO == request.Serie);
+
+        if (request.Folio.HasValue)
+            query = query.Where(d => d.CFOLIO == request.Folio.Value);
 
         if (request.FechaDesde.HasValue)
             query = query.Where(d => d.CFECHA >= request.FechaDesde.Value);
