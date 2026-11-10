@@ -4,6 +4,8 @@ using AppComercial.Domain.Interfaces.SdkModels;
 using System.ComponentModel.DataAnnotations;
 using AppComercial.Application.Common.Interfaces;
 using System.Collections.Generic;
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 
 namespace AppComercial.Application.Features.Cotizaciones;
 
@@ -95,16 +97,20 @@ public class CotizacionPartida
 public class CreateCotizacionCommandHandler : IRequestHandler<CreateCotizacionCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
     private readonly ICurrentUserService _currentUserService;
 
-    public CreateCotizacionCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService)
+    public CreateCotizacionCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService, IConceptoDocumentoValidator conceptoValidator)
     {
         _sdk = sdk;
         _currentUserService = currentUserService;
+        _conceptoValidator = conceptoValidator;
     }
 
     public async Task<int> Handle(CreateCotizacionCommand request, CancellationToken cancellationToken)
     {
+        await _conceptoValidator.ValidarAsync(request.CodigoConcepto, TiposDocumento.Cotizacion, cancellationToken);
+
         var documento = new tDocumento
         {
             aCodConcepto   = request.CodigoConcepto,

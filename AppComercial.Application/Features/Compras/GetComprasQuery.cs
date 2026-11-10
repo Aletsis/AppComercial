@@ -3,6 +3,7 @@ using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using AppComercial.Application.Common;
 
 namespace AppComercial.Application.Features.Compras;
 
@@ -32,7 +33,7 @@ public class GetComprasQueryHandler : IRequestHandler<GetComprasQuery, IEnumerab
     {
         // CIDDOCUMENTODE = 19 → Compras
         var conceptosCompra = await _dbContext.Conceptos
-            .Where(c => c.CIDDOCUMENTODE == 19)
+            .Where(c => c.CIDDOCUMENTODE == TiposDocumento.Compra)
             .Select(c => c.CIDCONCEPTODOCUMENTO)
             .ToListAsync(cancellationToken);
 

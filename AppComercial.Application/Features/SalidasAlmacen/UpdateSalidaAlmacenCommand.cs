@@ -2,6 +2,8 @@ using MediatR;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using System.ComponentModel.DataAnnotations;
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 
 namespace AppComercial.Application.Features.SalidasAlmacen;
 
@@ -73,14 +75,18 @@ public class UpdateSalidaAlmacenCommand : IRequest<int>
 public class UpdateSalidaAlmacenCommandHandler : IRequestHandler<UpdateSalidaAlmacenCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
 
-    public UpdateSalidaAlmacenCommandHandler(IContpaqiSdk sdk)
+    public UpdateSalidaAlmacenCommandHandler(IContpaqiSdk sdk, IConceptoDocumentoValidator conceptoValidator)
     {
         _sdk = sdk;
+        _conceptoValidator = conceptoValidator;
     }
 
     public async Task<int> Handle(UpdateSalidaAlmacenCommand request, CancellationToken cancellationToken)
     {
+        await _conceptoValidator.ValidarAsync(request.CodigoConcepto, TiposDocumento.SalidaAlmacen, cancellationToken);
+
         var datos = new Dictionary<string, string>();
 
         if (!string.IsNullOrWhiteSpace(request.Referencia))

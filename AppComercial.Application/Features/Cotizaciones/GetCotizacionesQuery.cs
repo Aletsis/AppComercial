@@ -3,6 +3,7 @@ using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using AppComercial.Application.Common;
 
 namespace AppComercial.Application.Features.Cotizaciones;
 
@@ -46,8 +47,8 @@ public class GetCotizacionesQueryHandler : IRequestHandler<GetCotizacionesQuery,
 
     public async Task<IEnumerable<AdmDocumentos>> Handle(GetCotizacionesQuery request, CancellationToken cancellationToken)
     {
-        // Filtrar conceptos de naturaleza Venta (1)
-        var conceptosQuery = _dbContext.Conceptos.Where(c => c.CNATURALEZA == 1);
+        // Conceptos de tipo Cotización (CIDDOCUMENTODE). CNATURALEZA no distingue cotizaciones de facturas, pedidos o remisiones.
+        var conceptosQuery = _dbContext.Conceptos.Where(c => c.CIDDOCUMENTODE == TiposDocumento.Cotizacion);
 
         if (!string.IsNullOrWhiteSpace(request.CodigoConcepto))
             conceptosQuery = conceptosQuery.Where(c => c.CCODIGOCONCEPTO == request.CodigoConcepto);

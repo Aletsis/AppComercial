@@ -1,3 +1,5 @@
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 using AppComercial.Application.Features.EntradasAlmacen;
 using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
@@ -61,6 +63,10 @@ public class EntradasAlmacenController : ControllerBase
             var result = await _mediator.Send(command);
             return Ok(result);
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al crear la entrada de almacén en el SDK: {ex.Message}");
@@ -83,6 +89,10 @@ public class EntradasAlmacenController : ControllerBase
             command.Folio          = folio;
             var result = await _mediator.Send(command);
             return Ok(result);
+        }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

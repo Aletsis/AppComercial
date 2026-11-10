@@ -3,6 +3,7 @@ using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using AppComercial.Application.Common;
 
 namespace AppComercial.Application.Features.NotasCredito;
 
@@ -42,8 +43,8 @@ public class GetNotasCreditoQueryHandler : IRequestHandler<GetNotasCreditoQuery,
 
     public async Task<IEnumerable<AdmDocumentos>> Handle(GetNotasCreditoQuery request, CancellationToken cancellationToken)
     {
-        // Filtrar conceptos de naturaleza Devolución sobre Venta (3)
-        var conceptosQuery = _dbContext.Conceptos.Where(c => c.CNATURALEZA == 3);
+        // Conceptos de tipo Nota de Crédito (CIDDOCUMENTODE)
+        var conceptosQuery = _dbContext.Conceptos.Where(c => c.CIDDOCUMENTODE == TiposDocumento.NotaCredito);
 
         if (!string.IsNullOrWhiteSpace(request.CodigoConcepto))
             conceptosQuery = conceptosQuery.Where(c => c.CCODIGOCONCEPTO == request.CodigoConcepto);

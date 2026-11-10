@@ -2,6 +2,8 @@ using MediatR;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using System.ComponentModel.DataAnnotations;
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 
 namespace AppComercial.Application.Features.NotasCredito;
 
@@ -61,14 +63,18 @@ public class UpdateNotaCreditoCommand : IRequest<int>
 public class UpdateNotaCreditoCommandHandler : IRequestHandler<UpdateNotaCreditoCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
 
-    public UpdateNotaCreditoCommandHandler(IContpaqiSdk sdk)
+    public UpdateNotaCreditoCommandHandler(IContpaqiSdk sdk, IConceptoDocumentoValidator conceptoValidator)
     {
         _sdk = sdk;
+        _conceptoValidator = conceptoValidator;
     }
 
     public async Task<int> Handle(UpdateNotaCreditoCommand request, CancellationToken cancellationToken)
     {
+        await _conceptoValidator.ValidarAsync(request.CodigoConcepto, TiposDocumento.NotaCredito, cancellationToken);
+
         var datos = new Dictionary<string, string>();
 
         if (!string.IsNullOrWhiteSpace(request.CodigoCliente))

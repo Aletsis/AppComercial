@@ -6,6 +6,8 @@ using AppComercial.Application.Common.Interfaces;
 using System.Collections.Generic;
 
 using AppComercial.Application.DTOs;
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 
 namespace AppComercial.Application.Features.NotasCredito;
 
@@ -71,16 +73,22 @@ public class CreateNotaCreditoResult
 public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCreditoCommand, CreateNotaCreditoResult>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
     private readonly ICurrentUserService _currentUserService;
 
-    public CreateNotaCreditoCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService)
+    public CreateNotaCreditoCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService, IConceptoDocumentoValidator conceptoValidator)
     {
         _sdk = sdk;
         _currentUserService = currentUserService;
+        _conceptoValidator = conceptoValidator;
     }
 
     public async Task<CreateNotaCreditoResult> Handle(CreateNotaCreditoCommand request, CancellationToken cancellationToken)
     {
+        await _conceptoValidator.ValidarAsync(request.CodigoConcepto, TiposDocumento.NotaCredito, cancellationToken);
+        if (request.SaldarFacturaOrigen && !string.IsNullOrWhiteSpace(request.ConceptoFacturaOrigen))
+            await _conceptoValidator.ValidarAsync(request.ConceptoFacturaOrigen, TiposDocumento.Factura, cancellationToken);
+
         // 1. Crear el documento Nota de Crédito (Egreso)
         var documento = new tDocumento
         {
@@ -126,19 +134,25 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
         // Esto genera el nodo <cfdi:CfdiRelacionados TipoRelacion="01"> en el XML del timbrado.
         if (!string.IsNullOrWhiteSpace(request.UuidFacturaOrigen))
         {
-            await _sdk.AgregarRelacionCfdiAsync(request.UuidFacturaOrigen, request.TipoRelacionSat);
+            await _sdk.AgregarRelacionCfdiAsync(idDocumento, request.UuidFacturaOrigen, request.TipoRelacionSat);
         }
 
-        // Leer Folio y Serie reales asignados por el SDK
-        string folioReal = "0";
+        // Leer Folio y Serie reales asignados por el SDK.
+        // Si no se pueden leer, no se timbra ni se salda: hacerlo con un folio supuesto afectaría otro documento.
+        string folioReal = string.Empty;
         try
         {
-            folioReal = await _sdk.LeerDatoDocumentoAsync("CFOLIO");
+            folioReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "CFOLIO");
         }
         catch
         {
-            try { folioReal = await _sdk.LeerDatoDocumentoAsync("cFolio"); } catch { folioReal = idDocumento.ToString(); }
+            try { folioReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "cFolio"); } catch { /* folio no disponible */ }
         }
+        bool folioValido = double.TryParse(folioReal, out double folioNum) && folioNum > 0;
+
+        string serieReal = request.Serie;
+        try { serieReal = (await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "CSERIEDOCUMENTO")).Trim(); }
+        catch { /* mantener serie del request */ }
 
         // 5. Timbrar (emitir) la nota de crédito
         bool timbrado = false;
@@ -148,12 +162,12 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
             if (string.IsNullOrWhiteSpace(request.CsdPassword))
                 throw new ArgumentException("La contraseña del CSD es requerida para timbrar la nota de crédito automáticamente.");
 
-            if (double.TryParse(folioReal, out double folioNum))
+            if (folioValido)
             {
                 var camposALeer = new[] { "CUUID", "CCADENAORIGINAL", "CSELLOEMISOR", "CSATSELLO", "CCERTIFICADOEMISOR", "CCERTIFICADOSAT", "CFECHA", "CHORA" };
                 var datosLeidos = await _sdk.EmitirDocumentoYLeerDatosAsync(
                     request.CodigoConcepto,
-                    request.Serie,
+                    serieReal,
                     folioNum,
                     request.CsdPassword,
                     string.Empty,
@@ -183,6 +197,7 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
         // 6. Saldar la factura origen en CXC para eliminar el adeudo del cliente
         bool saldado = false;
         if (request.SaldarFacturaOrigen
+            && folioValido
             && !string.IsNullOrWhiteSpace(request.ConceptoFacturaOrigen)
             && request.FolioFacturaOrigen > 0)
         {
@@ -191,8 +206,8 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
                 request.SerieFacturaOrigen,
                 request.FolioFacturaOrigen,
                 request.CodigoConcepto,
-                request.Serie,
-                idDocumento);
+                serieReal,
+                folioNum);
             saldado = true;
         }
 
@@ -203,6 +218,7 @@ public class CreateNotaCreditoCommandHandler : IRequestHandler<CreateNotaCredito
             Saldado     = saldado,
             DatosFiscales = datosFiscales,
             Mensaje     = $"Nota de Crédito creada (id: {idDocumento}). Timbrada: {timbrado}. CXC Saldada: {saldado}."
+                          + (folioValido ? string.Empty : " (Aviso: no se pudo leer el folio asignado; no se timbró ni se saldó.)")
         };
     }
 }

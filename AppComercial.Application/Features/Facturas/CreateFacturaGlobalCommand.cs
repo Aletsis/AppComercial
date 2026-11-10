@@ -5,6 +5,8 @@ using AppComercial.Application.DTOs;
 using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 
 namespace AppComercial.Application.Features.Facturas;
 
@@ -141,16 +143,20 @@ public class TicketGlobal
 public class CreateFacturaGlobalCommandHandler : IRequestHandler<CreateFacturaGlobalCommand, CreateFacturaResult>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
     private readonly IConfiguration _configuration;
 
-    public CreateFacturaGlobalCommandHandler(IContpaqiSdk sdk, IConfiguration configuration)
+    public CreateFacturaGlobalCommandHandler(IContpaqiSdk sdk, IConfiguration configuration, IConceptoDocumentoValidator conceptoValidator)
     {
         _sdk = sdk;
         _configuration = configuration;
+        _conceptoValidator = conceptoValidator;
     }
 
     public async Task<CreateFacturaResult> Handle(CreateFacturaGlobalCommand request, CancellationToken cancellationToken)
     {
+        await _conceptoValidator.ValidarAsync(request.CodigoConcepto, TiposDocumento.Factura, cancellationToken);
+
         var ahora = DateTime.Now;
         var anio  = string.IsNullOrWhiteSpace(request.Anio)  ? ahora.Year.ToString()     : request.Anio;
         var meses = string.IsNullOrWhiteSpace(request.Meses) ? ahora.Month.ToString("D2") : request.Meses;
@@ -319,14 +325,14 @@ public class CreateFacturaGlobalCommandHandler : IRequestHandler<CreateFacturaGl
         // 3. Leer Folio y Serie reales asignados por el SDK
         string folioReal = "0";
         string serieReal = request.Serie;
-        try { folioReal = await _sdk.LeerDatoDocumentoAsync("CFOLIO"); }
-        catch { try { folioReal = await _sdk.LeerDatoDocumentoAsync("cFolio"); } catch { folioReal = idDocumento.ToString(); } }
+        try { folioReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "CFOLIO"); }
+        catch { try { folioReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "cFolio"); } catch { folioReal = idDocumento.ToString(); } }
 
-        try { serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIEDOCUMENTO"); }
+        try { serieReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "CSERIEDOCUMENTO"); }
         catch
         {
-            try { serieReal = await _sdk.LeerDatoDocumentoAsync("CSERIE"); }
-            catch { try { serieReal = await _sdk.LeerDatoDocumentoAsync("cSerie"); } catch { /* mantener serie del request */ } }
+            try { serieReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "CSERIE"); }
+            catch { try { serieReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "cSerie"); } catch { /* mantener serie del request */ } }
         }
 
         // 4. Configurar campos CFDI 4.0 e InformacionGlobal

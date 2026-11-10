@@ -40,7 +40,10 @@ public interface IContpaqiSdk
     Task<Dictionary<string, string>> EmitirDocumentoYLeerDatosAsync(string codigoConcepto, string serie, double folio, string pass, string email, IEnumerable<string> campos);
     Task<int> CancelarDocumentoAsync(string codigoConcepto, string serie, double folio, string pass);
     Task<int> SaldarDocumentoAsync(string codigoConceptoDoc, string serieDoc, double folioDoc, string codigoConceptoPago, string seriePago, double folioPago);
-    Task<int> AgregarRelacionCfdiAsync(string uuid, string tipoRelacion);
+    /// <summary>
+    /// Posiciona el documento por id y le agrega una relación CFDI, todo bajo el mismo bloqueo del SDK.
+    /// </summary>
+    Task<int> AgregarRelacionCfdiAsync(int idDocumento, string uuid, string tipoRelacion);
 
     // Nuevas funcionalidades agregadas
     Task<int> CrearAgenteAsync(Dictionary<string, string> datos);
@@ -79,7 +82,9 @@ public interface IContpaqiSdk
     Task<string> GenerarPdfAsync(string codigoConcepto, string serie, double folio, string rutaEmpresa);
 
     /// <summary>
-    /// Lee un dato del documento que se encuentra actualmente en el "cursor" del SDK.
+    /// Posiciona el documento por id y lee un campo, todo bajo el mismo bloqueo del SDK.
+    /// No depende del "cursor" que haya dejado una llamada anterior, por lo que es seguro
+    /// ante peticiones concurrentes.
     /// </summary>
-    Task<string> LeerDatoDocumentoAsync(string campo);
+    Task<string> LeerDatoDocumentoPorIdAsync(int idDocumento, string campo);
 }

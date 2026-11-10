@@ -1,3 +1,5 @@
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 using AppComercial.Application.Features.Compras;
 using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
@@ -20,13 +22,15 @@ public class ComprasController : ControllerBase
     private readonly ILogger<ComprasController> _logger;
     private readonly IContpaqiSdk _sdk;
     private readonly IConfiguration _config;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
 
-    public ComprasController(IMediator mediator, ILogger<ComprasController> logger, IContpaqiSdk sdk, IConfiguration config)
+    public ComprasController(IMediator mediator, ILogger<ComprasController> logger, IContpaqiSdk sdk, IConfiguration config, IConceptoDocumentoValidator conceptoValidator)
     {
         _mediator = mediator;
         _logger = logger;
         _sdk = sdk;
         _config = config;
+        _conceptoValidator = conceptoValidator;
     }
 
     /// <summary>
@@ -72,6 +76,10 @@ public class ComprasController : ControllerBase
             var result = await _mediator.Send(command);
             return Ok(result);
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al crear la compra en el SDK: {ex.Message}");
@@ -94,6 +102,10 @@ public class ComprasController : ControllerBase
             var result = await _mediator.Send(command);
             return Ok(result);
         }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
             return StatusCode(500, $"Error al actualizar la compra en el SDK: {ex.Message}");
@@ -114,12 +126,18 @@ public class ComprasController : ControllerBase
 
             if (serie == "-" || serie == "none") serie = string.Empty;
 
+            await _conceptoValidator.ValidarAsync(codigoConcepto, TiposDocumento.Compra);
+
             _logger.LogInformation("Generando PDF para Compra: {Concepto}/{Serie}/{Folio}", codigoConcepto, serie, folio);
 
             string rutaPdf = await _sdk.GenerarPdfAsync(codigoConcepto, serie, folio, rutaEmpresa);
 
             var bytes = await System.IO.File.ReadAllBytesAsync(rutaPdf);
             return File(bytes, "application/pdf", $"{codigoConcepto}{serie}{folio}.pdf");
+        }
+        catch (TipoDocumentoInvalidoException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

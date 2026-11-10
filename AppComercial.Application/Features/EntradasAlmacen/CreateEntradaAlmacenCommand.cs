@@ -3,6 +3,8 @@ using AppComercial.Domain.Interfaces;
 using AppComercial.Domain.Interfaces.SdkModels;
 using AppComercial.Application.Common.Interfaces;
 using System.Collections.Generic;
+using AppComercial.Application.Common;
+using AppComercial.Application.Common.Services;
 
 namespace AppComercial.Application.Features.EntradasAlmacen;
 
@@ -34,16 +36,20 @@ public class EntradaPartida
 public class CreateEntradaAlmacenCommandHandler : IRequestHandler<CreateEntradaAlmacenCommand, int>
 {
     private readonly IContpaqiSdk _sdk;
+    private readonly IConceptoDocumentoValidator _conceptoValidator;
     private readonly ICurrentUserService _currentUserService;
 
-    public CreateEntradaAlmacenCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService)
+    public CreateEntradaAlmacenCommandHandler(IContpaqiSdk sdk, ICurrentUserService currentUserService, IConceptoDocumentoValidator conceptoValidator)
     {
         _sdk = sdk;
         _currentUserService = currentUserService;
+        _conceptoValidator = conceptoValidator;
     }
 
     public async Task<int> Handle(CreateEntradaAlmacenCommand request, CancellationToken cancellationToken)
     {
+        await _conceptoValidator.ValidarAsync(request.CodigoConcepto, TiposDocumento.EntradaAlmacen, cancellationToken);
+
         // 1. Crear la cabecera del documento
         var documento = new tDocumento
         {

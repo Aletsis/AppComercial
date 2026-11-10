@@ -3,6 +3,7 @@ using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using AppComercial.Application.Common;
 
 namespace AppComercial.Application.Features.Traspasos;
 
@@ -30,7 +31,7 @@ public class GetTraspasosQueryHandler : IRequestHandler<GetTraspasosQuery, IEnum
     {
         // CIDDOCUMENTODE = 34 o CNATURALEZA = 6 → Traspasos
         var conceptosTraspaso = await _dbContext.Conceptos
-            .Where(c => c.CIDDOCUMENTODE == 34 || c.CNATURALEZA == 6)
+            .Where(c => c.CIDDOCUMENTODE == TiposDocumento.Traspaso || c.CNATURALEZA == 6)
             .Select(c => c.CIDCONCEPTODOCUMENTO)
             .ToListAsync(cancellationToken);
 

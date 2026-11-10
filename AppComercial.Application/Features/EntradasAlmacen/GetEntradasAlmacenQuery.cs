@@ -3,6 +3,7 @@ using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using AppComercial.Application.Common;
 
 namespace AppComercial.Application.Features.EntradasAlmacen;
 
@@ -31,7 +32,7 @@ public class GetEntradasAlmacenQueryHandler : IRequestHandler<GetEntradasAlmacen
     {
         // Obtenemos IDs de conceptos que sean Entradas de Almacén (CIDDOCUMENTODE = 32)
         var conceptosEntrada = await _dbContext.Conceptos
-            .Where(c => c.CIDDOCUMENTODE == 32)
+            .Where(c => c.CIDDOCUMENTODE == TiposDocumento.EntradaAlmacen)
             .Select(c => c.CIDCONCEPTODOCUMENTO)
             .ToListAsync(cancellationToken);
 

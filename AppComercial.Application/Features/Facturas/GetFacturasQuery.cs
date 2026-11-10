@@ -3,6 +3,7 @@ using AppComercial.Domain.Entities;
 using AppComercial.Domain.Interfaces;
 using AppComercial.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using AppComercial.Application.Common;
 
 namespace AppComercial.Application.Features.Facturas;
 
@@ -42,9 +43,9 @@ public class GetFacturasQueryHandler : IRequestHandler<GetFacturasQuery, IEnumer
 
     public async Task<IEnumerable<AdmDocumentos>> Handle(GetFacturasQuery request, CancellationToken cancellationToken)
     {
-        // Obtener los IDs de conceptos con naturaleza Venta (1)
+        // Conceptos de tipo Factura (CIDDOCUMENTODE). CNATURALEZA no distingue facturas de cotizaciones, pedidos o remisiones.
         var conceptosVentaIds = _dbContext.Conceptos
-            .Where(c => c.CNATURALEZA == 1);
+            .Where(c => c.CIDDOCUMENTODE == TiposDocumento.Factura);
 
         if (!string.IsNullOrWhiteSpace(request.CodigoConcepto))
             conceptosVentaIds = conceptosVentaIds.Where(c => c.CCODIGOCONCEPTO == request.CodigoConcepto);
