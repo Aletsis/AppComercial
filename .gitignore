@@ -79,5 +79,8 @@ launchSettings.json
 ## Otros
 Releases/
 *.xml
+.DS_Store
+*binpublish/
+**/.nuget/
 
 

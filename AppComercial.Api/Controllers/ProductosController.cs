@@ -61,6 +61,21 @@ public class ProductosController : ControllerBase
         }
     }
 
+    [HttpPost("by-ids")]
+    public async Task<ActionResult<IEnumerable<ProductoDto>>> GetByIds([FromBody] List<int> ids)
+    {
+        try
+        {
+            var query = new GetProductosByIdsQuery(ids);
+            var result = await _mediator.Send(query);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error al obtener productos por IDs: {ex.Message}");
+        }
+    }
+
     [HttpPost]
     public async Task<ActionResult<int>> Post([FromBody] CreateProductoCommand command)
     {

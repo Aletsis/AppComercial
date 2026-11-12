@@ -43,7 +43,8 @@ public class ComprasController : ControllerBase
         [FromQuery] double? folio,
         [FromQuery] int? proveedorId,
         [FromQuery] DateTime? fechaDesde,
-        [FromQuery] DateTime? fechaHasta)
+        [FromQuery] DateTime? fechaHasta,
+        [FromQuery] int? limit = null)
     {
         try
         {
@@ -54,7 +55,8 @@ public class ComprasController : ControllerBase
                 Folio          = folio,
                 ProveedorId    = proveedorId,
                 FechaDesde     = fechaDesde,
-                FechaHasta     = fechaHasta
+                FechaHasta     = fechaHasta,
+                Limit          = limit
             };
             var result = await _mediator.Send(query);
             return Ok(result);

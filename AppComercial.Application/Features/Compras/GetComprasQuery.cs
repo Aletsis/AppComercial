@@ -18,6 +18,8 @@ public class GetComprasQuery : IRequest<IEnumerable<AdmDocumentos>>
     public DateTime? FechaDesde { get; set; }
     public DateTime? FechaHasta { get; set; }
     public int? ProveedorId { get; set; }
+    /// <summary>Máximo de compras a retornar. Por defecto: 500.</summary>
+    public int? Limit { get; set; }
 }
 
 public class GetComprasQueryHandler : IRequestHandler<GetComprasQuery, IEnumerable<AdmDocumentos>>
@@ -68,11 +70,13 @@ public class GetComprasQueryHandler : IRequestHandler<GetComprasQuery, IEnumerab
         if (request.ProveedorId.HasValue)
             query = query.Where(d => d.CIDCLIENTEPROVEEDOR == request.ProveedorId.Value);
 
+        var takeLimit = (request.Limit.HasValue && request.Limit.Value > 0) ? request.Limit.Value : 500;
+
         var rawResults = await (from d in query
                                  join c in _dbContext.Conceptos.AsNoTracking() on d.CIDCONCEPTODOCUMENTO equals c.CIDCONCEPTODOCUMENTO
                                  select new { d, ConceptoCodigo = c.CCODIGOCONCEPTO, c.CIDALMASUM })
                                 .OrderByDescending(x => x.d.CIDDOCUMENTO)
-                                .Take(100)
+                                .Take(takeLimit)
                                 .ToListAsync(cancellationToken);
 
         foreach (var item in rawResults)

@@ -211,4 +211,11 @@ public class AdmMovimientos
     [Column("COBJIMPU01")]
     public string? COBJIMPU01 { get; set; }
 
+    [NotMapped]
+    [System.Text.Json.Serialization.JsonPropertyName("ccodigoproducto")]
+    public string? CCODIGOPRODUCTO { get; set; }
+
+    [NotMapped]
+    [System.Text.Json.Serialization.JsonPropertyName("cnombreproducto")]
+    public string? CNOMBREPRODUCTO { get; set; }
 }

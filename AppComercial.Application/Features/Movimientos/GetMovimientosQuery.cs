@@ -41,6 +41,18 @@ public class GetMovimientosQueryHandler : IRequestHandler<GetMovimientosQuery, I
             query = query.OrderByDescending(m => m.CIDMOVIMIENTO).Take(500); 
         }
 
-        return await query.ToListAsync(cancellationToken);
+        var rawResults = await (from m in query
+                                 join p in _dbContext.Productos.AsNoTracking() on m.CIDPRODUCTO equals p.CIDPRODUCTO into prodGroup
+                                 from p in prodGroup.DefaultIfEmpty()
+                                 select new { m, CodigoProducto = p.CCODIGOPRODUCTO, NombreProducto = p.CNOMBREPRODUCTO })
+                                .ToListAsync(cancellationToken);
+
+        foreach (var item in rawResults)
+        {
+            item.m.CCODIGOPRODUCTO = item.CodigoProducto?.Trim();
+            item.m.CNOMBREPRODUCTO = item.NombreProducto?.Trim();
+        }
+
+        return rawResults.Select(x => x.m);
     }
 }
