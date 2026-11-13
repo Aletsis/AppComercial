@@ -168,7 +168,6 @@ public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, C
 
         var datosEdicion = new Dictionary<string, string>
         {
-            ["CTEXTOEXTRA2"] = usuario,
             ["CTEXTOEXTRA3"] = usuario
         };
         if (!string.IsNullOrWhiteSpace(request.Observaciones))

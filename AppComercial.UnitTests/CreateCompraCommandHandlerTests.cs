@@ -69,7 +69,7 @@ public class CreateCompraCommandHandlerTests
         Assert.NotNull(updatedFields);
         Assert.True(updatedFields.ContainsKey("CTEXTOEXTRA3"));
         Assert.Equal("juan.perez", updatedFields["CTEXTOEXTRA3"]);
-        Assert.Equal("juan.perez", updatedFields["CTEXTOEXTRA2"]);
+        Assert.False(updatedFields.ContainsKey("CTEXTOEXTRA2"));
     }
 
     [Fact]
@@ -117,5 +117,6 @@ public class CreateCompraCommandHandlerTests
         Assert.NotNull(result);
         Assert.NotNull(updatedFields);
         Assert.Equal("admin.blanquita", updatedFields["CTEXTOEXTRA3"]);
+        Assert.False(updatedFields.ContainsKey("CTEXTOEXTRA2"));
     }
 }
