@@ -81,6 +81,17 @@ public class CreateCompraCommand : IRequest<CreateCompraResult>
     /// </summary>
     [MinLength(1, ErrorMessage = "La compra debe tener al menos una partida.")]
     public List<CompraPartida> Partidas { get; set; } = new();
+
+    /// <summary>
+    /// Usuario que registra la compra (se guarda en CTEXTOEXTRA3).
+    /// Si no se proporciona, se tomará del usuario autenticado o 'SISTEMA'.
+    /// </summary>
+    public string? Usuario { get; set; }
+
+    /// <summary>
+    /// Valor para CTEXTOEXTRA3. Si no se especifica, toma el valor de <see cref="Usuario"/>.
+    /// </summary>
+    public string? TextoExtra3 { get; set; }
 }
 
 public class CreateCompraResult
@@ -149,9 +160,16 @@ public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, C
 
         var idDocumento = await _sdk.CrearDocumentoAsync(documento);
 
+        var usuario = !string.IsNullOrWhiteSpace(request.TextoExtra3)
+            ? request.TextoExtra3.Trim()
+            : (!string.IsNullOrWhiteSpace(request.Usuario)
+                ? request.Usuario.Trim()
+                : (_currentUserService.GetCurrentUsuario() ?? "SISTEMA"));
+
         var datosEdicion = new Dictionary<string, string>
         {
-            ["CTEXTOEXTRA2"] = _currentUserService.GetCurrentUsuario() ?? "SISTEMA"
+            ["CTEXTOEXTRA2"] = usuario,
+            ["CTEXTOEXTRA3"] = usuario
         };
         if (!string.IsNullOrWhiteSpace(request.Observaciones))
         {

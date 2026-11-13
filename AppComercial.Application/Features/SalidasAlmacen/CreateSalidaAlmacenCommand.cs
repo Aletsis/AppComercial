@@ -47,6 +47,17 @@ public class CreateSalidaAlmacenCommand : IRequest<CreateSalidaAlmacenResult>
     /// </summary>
     [MinLength(1, ErrorMessage = "La salida de almacén debe tener al menos una partida.")]
     public List<SalidaPartida> Partidas { get; set; } = new();
+
+    /// <summary>
+    /// Usuario que registra la salida (se guarda en CTEXTOEXTRA2 y CTEXTOEXTRA3).
+    /// Si no se proporciona, se tomará del usuario autenticado o 'SISTEMA'.
+    /// </summary>
+    public string? Usuario { get; set; }
+
+    /// <summary>
+    /// Valor para CTEXTOEXTRA3. Si no se especifica, toma el valor de <see cref="Usuario"/>.
+    /// </summary>
+    public string? TextoExtra3 { get; set; }
 }
 
 /// <summary>
@@ -116,9 +127,16 @@ public class CreateSalidaAlmacenCommandHandler : IRequestHandler<CreateSalidaAlm
 
         var idDocumento = await _sdk.CrearDocumentoAsync(documento);
 
+        var usuario = !string.IsNullOrWhiteSpace(request.TextoExtra3)
+            ? request.TextoExtra3.Trim()
+            : (!string.IsNullOrWhiteSpace(request.Usuario)
+                ? request.Usuario.Trim()
+                : (_currentUserService.GetCurrentUsuario() ?? "SISTEMA"));
+
         var datosEdicion = new Dictionary<string, string>
         {
-            ["CTEXTOEXTRA2"] = _currentUserService.GetCurrentUsuario() ?? "SISTEMA"
+            ["CTEXTOEXTRA2"] = usuario,
+            ["CTEXTOEXTRA3"] = usuario
         };
         if (!string.IsNullOrWhiteSpace(request.Observaciones))
         {
