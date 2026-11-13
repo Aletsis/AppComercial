@@ -97,7 +97,7 @@ public class ClientesController : ControllerBase
     {
         try
         {
-            command.TipoCliente = 1;
+            if (command.TipoCliente != 2) command.TipoCliente = 1;
             var result = await _mediator.Send(command);
             return CreatedAtAction(nameof(GetByCodigo), new { codigo = command.Codigo }, result);
         }
@@ -119,7 +119,7 @@ public class ClientesController : ControllerBase
     {
         try
         {
-            command.TipoCliente = 1;
+            if (command.TipoCliente.HasValue && command.TipoCliente.Value != 2) command.TipoCliente = 1;
             command.Codigo = codigo;
             var result = await _mediator.Send(command);
             return Ok(result);

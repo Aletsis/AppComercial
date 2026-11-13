@@ -96,6 +96,7 @@ public class ProveedoresController : ControllerBase
     {
         try
         {
+            if (command.TipoCliente != 2) command.TipoCliente = 3;
             var result = await _mediator.Send(command);
             return CreatedAtAction(nameof(GetByCodigo), new { codigo = command.Codigo }, result);
         }
@@ -117,6 +118,7 @@ public class ProveedoresController : ControllerBase
     {
         try
         {
+            if (command.TipoCliente.HasValue && command.TipoCliente.Value != 2) command.TipoCliente = 3;
             command.Codigo = codigo;
             var result = await _mediator.Send(command);
             return Ok(result);

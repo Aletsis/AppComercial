@@ -57,8 +57,10 @@ public class UpdateProveedorCommand : IRequest<int>
     // Estatus
     public bool? Activo { get; set; }
 
-    [System.Text.Json.Serialization.JsonIgnore]
-    public int TipoCliente { get; set; } = 3; // 3 = Proveedor
+    /// <summary>
+    /// Tipo de catálogo en CONTPAQi: 3 = Solo Proveedor, 2 = Ambos (Cliente y Proveedor).
+    /// </summary>
+    public int? TipoCliente { get; set; }
 }
 
 public class UpdateProveedorCommandHandler : IRequestHandler<UpdateProveedorCommand, int>
@@ -179,6 +181,11 @@ public class UpdateProveedorCommandHandler : IRequestHandler<UpdateProveedorComm
             actualizarParams["CESTATUS"] = request.Activo.Value ? "1" : "0";
             if (!request.Activo.Value)
                 actualizarParams["CFECHABAJA"] = DateTime.Now.ToString("MM/dd/yyyy");
+        }
+
+        if (request.TipoCliente.HasValue && (request.TipoCliente.Value == 3 || request.TipoCliente.Value == 2))
+        {
+            actualizarParams["CTIPOCLIENTE"] = request.TipoCliente.Value.ToString();
         }
 
         int result = 0;

@@ -54,8 +54,10 @@ public class CreateClienteCommand : IRequest<int>
     public string? CodigoAgenteVenta { get; set; }
     public string? CodigoAgenteCobro { get; set; }
 
-    [System.Text.Json.Serialization.JsonIgnore]
-    public int TipoCliente { get; set; } = 1; // 1 = Cliente
+    /// <summary>
+    /// Tipo de catálogo en CONTPAQi: 1 = Solo Cliente, 2 = Ambos (Cliente y Proveedor).
+    /// </summary>
+    public int TipoCliente { get; set; } = 1;
 }
 
 public class CreateClienteCommandHandler : IRequestHandler<CreateClienteCommand, int>
@@ -83,11 +85,37 @@ public class CreateClienteCommandHandler : IRequestHandler<CreateClienteCommand,
         if (string.IsNullOrWhiteSpace(rfc))
             rfc = "XAXX010101000";
 
-        // Validar si el código ya existe
-        var existe = await _context.Clientes.AnyAsync(c => c.CCODIGOCLIENTE == codigo, cancellationToken);
-        if (existe)
-            throw new Exception($"El código de cliente '{codigo}' ya existe en CONTPAQi.");
+        // Validar si el código ya existe en CONTPAQi Comercial
+        var clienteExistente = await _context.Clientes.FirstOrDefaultAsync(c => c.CCODIGOCLIENTE == codigo, cancellationToken);
+        if (clienteExistente != null)
+        {
+            // Si ya existe como proveedor puro (CTIPOCLIENTE == 3), lo convertimos a Ambos (2) y agregamos datos de cliente
+            if (clienteExistente.CTIPOCLIENTE == 3)
+            {
+                var actualizarParams = new Dictionary<string, string>
+                {
+                    ["CTIPOCLIENTE"] = "2"
+                };
 
+                if (request.ListaPrecio > 0)
+                    actualizarParams["CLISTAPRECIOCLIENTE"] = request.ListaPrecio.ToString();
+                if (request.LimiteCredito > 0)
+                    actualizarParams["CLIMITECREDITOCLIENTE"] = request.LimiteCredito.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (request.DiasCredito > 0)
+                    actualizarParams["CDIASCREDITOCLIENTE"] = request.DiasCredito.ToString();
+
+                actualizarParams["CBANVENTACREDITO"] = request.PermiteVentaCredito ? "1" : "0";
+                actualizarParams["CBANEXCEDERCREDITO"] = request.PermiteExcederCredito ? "1" : "0";
+
+                await _sdk.ActualizarClienteAsync(codigo, actualizarParams);
+                return clienteExistente.CIDCLIENTEPROVEEDOR;
+            }
+
+            var rolActual = clienteExistente.CTIPOCLIENTE == 2 ? "Cliente y Proveedor" : "Cliente";
+            throw new Exception($"El código '{codigo}' ya existe en CONTPAQi Comercial registrado como {rolActual}.");
+        }
+
+        var tipoFinal = (request.TipoCliente == 2) ? 2 : 1;
         var nuevoClienteParams = new tCteProv
         {
             cCodigoCliente = codigo,
@@ -97,7 +125,7 @@ public class CreateClienteCommandHandler : IRequestHandler<CreateClienteCommand,
             cDenComercial = request.DenominacionComercial?.Trim() ?? string.Empty,
             cRepLegal = request.RepresentanteLegal?.Trim() ?? string.Empty,
             cNombreMoneda = string.IsNullOrWhiteSpace(request.NombreMoneda) ? "Peso Mexicano" : request.NombreMoneda.Trim(),
-            cTipoCliente = request.TipoCliente == 0 ? 1 : request.TipoCliente,
+            cTipoCliente = tipoFinal,
             cListaPreciosCliente = request.ListaPrecio <= 0 ? 1 : request.ListaPrecio,
             cLimiteCreditoCliente = request.LimiteCredito,
             cDiasCreditoCliente = request.DiasCredito,
