@@ -66,6 +66,7 @@ public class CreateCompraCommandHandlerTests
         // Assert
         Assert.NotNull(result);
         Assert.Equal(docId, result.IdDocumento);
+        _sdkMock.Verify(s => s.CrearDocumentoAsync(It.Is<tDocumento>(d => d.aSerie == "PROV01")));
         Assert.NotNull(updatedFields);
         Assert.True(updatedFields.ContainsKey("CTEXTOEXTRA3"));
         Assert.Equal("juan.perez", updatedFields["CTEXTOEXTRA3"]);
@@ -118,5 +119,47 @@ public class CreateCompraCommandHandlerTests
         Assert.NotNull(updatedFields);
         Assert.Equal("admin.blanquita", updatedFields["CTEXTOEXTRA3"]);
         Assert.False(updatedFields.ContainsKey("CTEXTOEXTRA2"));
+    }
+
+    [Fact]
+    public async Task Handle_SetsSerieFromCodigoProveedor_TruncatingTo11CharsIfLonger()
+    {
+        // Arrange
+        int docId = 777;
+        _sdkMock.Setup(s => s.CrearDocumentoAsync(It.IsAny<tDocumento>()))
+            .ReturnsAsync(docId);
+        _sdkMock.Setup(s => s.CrearMovimientoAsync(docId, It.IsAny<tMovimiento>()))
+            .ReturnsAsync(1);
+        _sdkMock.Setup(s => s.LeerDatoDocumentoPorIdAsync(docId, "CFOLIO"))
+            .ReturnsAsync("1");
+        _sdkMock.Setup(s => s.LeerDatoDocumentoPorIdAsync(docId, "CSERIEDOCUMENTO"))
+            .ReturnsAsync("PROVEEDOR_1");
+
+        _sdkMock.Setup(s => s.ActualizarDocumentoPorIdAsync(docId, It.IsAny<Dictionary<string, string>>()))
+            .ReturnsAsync(1);
+
+        var handler = new CreateCompraCommandHandler(
+            _sdkMock.Object,
+            _currentUserServiceMock.Object,
+            _conceptoValidatorMock.Object);
+
+        var command = new CreateCompraCommand
+        {
+            CodigoConcepto = "COMP",
+            CodigoProveedor = "PROVEEDOR_12345", // 15 caracteres
+            CodigoAlmacen = "ALM01",
+            Partidas = new List<CompraPartida>
+            {
+                new() { CodigoProducto = "PROD01", Unidades = 1, PrecioUnitario = 10 }
+            }
+        };
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.NotNull(result);
+        // Debe truncarse a 11 caracteres: "PROVEEDOR_1"
+        _sdkMock.Verify(s => s.CrearDocumentoAsync(It.Is<tDocumento>(d => d.aSerie == "PROVEEDOR_1")));
     }
 }

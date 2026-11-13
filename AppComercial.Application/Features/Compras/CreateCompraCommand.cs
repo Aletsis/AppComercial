@@ -24,10 +24,10 @@ public class CreateCompraCommand : IRequest<CreateCompraResult>
     public string CodigoConcepto { get; set; } = string.Empty;
 
     /// <summary>
-    /// Serie del documento. Puede ser vacío si el concepto no maneja series.
-    /// Ejemplo: "A"
+    /// Serie del documento. Se asignará por defecto el código del proveedor seleccionado.
+    /// Ejemplo: "PROV001"
     /// </summary>
-    [StringLength(10, ErrorMessage = "La serie no puede exceder 10 caracteres.")]
+    [StringLength(30, ErrorMessage = "La serie no puede exceder 30 caracteres.")]
     public string Serie { get; set; } = string.Empty;
 
     /// <summary>
@@ -146,10 +146,20 @@ public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, C
         await _conceptoValidator.ValidarAsync(request.CodigoConcepto, TiposDocumento.Compra, cancellationToken);
 
         // 1. Crear la cabecera del documento de compra
+        // La serie de una compra debe ser el código del proveedor seleccionado
+        var serie = !string.IsNullOrWhiteSpace(request.CodigoProveedor)
+            ? request.CodigoProveedor.Trim()
+            : (!string.IsNullOrWhiteSpace(request.Serie) ? request.Serie.Trim() : string.Empty);
+
+        if (serie.Length > 11)
+        {
+            serie = serie[..11];
+        }
+
         var documento = new tDocumento
         {
             aCodConcepto   = request.CodigoConcepto,
-            aSerie         = request.Serie,
+            aSerie         = serie,
             aFolio         = request.Folio,
             aCodigoCteProv = request.CodigoProveedor,
             aReferencia    = request.Referencia,
@@ -195,7 +205,7 @@ public class CreateCompraCommandHandler : IRequestHandler<CreateCompraCommand, C
 
         // 3. Leer Folio y Serie reales asignados por el SDK
         string folioReal = request.Folio > 0 ? request.Folio.ToString() : "0";
-        string serieReal = request.Serie;
+        string serieReal = serie;
         try 
         { 
             folioReal = await _sdk.LeerDatoDocumentoPorIdAsync(idDocumento, "CFOLIO"); 
