@@ -1,9 +1,9 @@
-using AppComercial.Application.Features.Clientes;
+using AppComercial.Application.Features.Proveedores;
 using AppComercial.Application.DTOs;
-using AppComercial.Domain.Entities;
-using AppComercial.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Threading.Tasks;
 
 namespace AppComercial.Api.Controllers;
 
@@ -18,62 +18,138 @@ public class ProveedoresController : ControllerBase
         _mediator = mediator;
     }
 
+    /// <summary>
+    /// Consulta paginada del catálogo de proveedores con filtros opcionales.
+    /// </summary>
     [HttpGet]
-    public async Task<ActionResult<PaginatedResult<ClienteDto>>> Get(
+    public async Task<ActionResult<PaginatedResult<ProveedorDto>>> Get(
         [FromQuery] string? searchTerm,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50)
+        [FromQuery] int pageSize = 50,
+        [FromQuery] bool onlyActive = true)
     {
         try
         {
-            // En CONTPAQi Comercial el TipoCliente = 3 significa estrictamente Proveedor
-            // (1 = Cliente, 2 = Cliente/Proveedor, 3 = Proveedor)
-            var query = new GetClientesQuery 
+            var query = new GetProveedoresQuery 
             { 
                 SearchTerm = searchTerm, 
-                TipoCliente = 3,
                 Page = page,
-                PageSize = pageSize
+                PageSize = pageSize,
+                OnlyActive = onlyActive
             };
             var result = await _mediator.Send(query);
             return Ok(result);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error al obtener proveedores desde SQL Server: {ex.Message}");
+            return StatusCode(500, $"Error al obtener proveedores: {ex.Message}");
         }
     }
 
-    [HttpPost]
-    public async Task<ActionResult<int>> Post([FromBody] CreateClienteCommand command)
+    /// <summary>
+    /// Obtiene la ficha detallada de un proveedor por su código, incluyendo domicilio y condiciones de compra.
+    /// </summary>
+    [HttpGet("{codigo}")]
+    public async Task<ActionResult<ProveedorDetalleDto>> GetByCodigo(string codigo)
     {
         try
         {
-            // Forzamos que sea un proveedor al momento de crearlo con nuestro comando
-            command.TipoCliente = 3; 
-            var result = await _mediator.Send(command);
+            var query = new GetProveedorByCodigoQuery(codigo);
+            var result = await _mediator.Send(query);
+            if (result == null)
+                return NotFound($"No se encontró ningún proveedor con el código '{codigo}'.");
+
             return Ok(result);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error al crear el proveedor en el SDK COM: {ex.Message}");
+            return StatusCode(500, $"Error al obtener detalle del proveedor: {ex.Message}");
         }
     }
 
-    [HttpPut("{codigo}")]
-    public async Task<ActionResult<int>> Put(string codigo, [FromBody] UpdateClienteCommand command)
+    /// <summary>
+    /// Obtiene el saldo actual pendiente de pago, saldo vencido y documentos pendientes de un proveedor.
+    /// </summary>
+    [HttpGet("{codigo}/saldo")]
+    public async Task<ActionResult<SaldoProveedorDto>> GetSaldo(string codigo)
     {
         try
         {
-            // Forzamos que sea un proveedor al momento de actualizarlo
-            command.TipoCliente = 3; 
+            var query = new GetSaldoProveedorQuery(codigo);
+            var result = await _mediator.Send(query);
+            if (result == null)
+                return NotFound($"No se encontró ningún proveedor con el código '{codigo}'.");
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error al obtener saldo del proveedor: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Registra un nuevo proveedor en CONTPAQi Comercial vía SDK con opción de domicilio fiscal.
+    /// </summary>
+    [HttpPost]
+    public async Task<ActionResult<int>> Post([FromBody] CreateProveedorCommand command)
+    {
+        try
+        {
+            var result = await _mediator.Send(command);
+            return CreatedAtAction(nameof(GetByCodigo), new { codigo = command.Codigo }, result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error al crear el proveedor en el SDK: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Actualiza los datos generales, fiscales, de crédito o compra de un proveedor existente.
+    /// </summary>
+    [HttpPut("{codigo}")]
+    public async Task<ActionResult<int>> Put(string codigo, [FromBody] UpdateProveedorCommand command)
+    {
+        try
+        {
             command.Codigo = codigo;
             var result = await _mediator.Send(command);
             return Ok(result);
         }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error al actualizar el proveedor en el SDK COM: {ex.Message}");
+            return StatusCode(500, $"Error al actualizar el proveedor en el SDK: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Modifica el estatus de un proveedor (Baja lógica o reactivación).
+    /// </summary>
+    [HttpPatch("{codigo}/estatus")]
+    public async Task<ActionResult<bool>> CambiarEstatus(string codigo, [FromQuery] bool activo)
+    {
+        try
+        {
+            var command = new CambiarEstatusProveedorCommand(codigo, activo);
+            var result = await _mediator.Send(command);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error al actualizar el estatus del proveedor: {ex.Message}");
         }
     }
 }

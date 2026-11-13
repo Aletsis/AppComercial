@@ -1,9 +1,9 @@
 using AppComercial.Application.Features.Clientes;
 using AppComercial.Application.DTOs;
-using AppComercial.Domain.Entities;
-using AppComercial.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Threading.Tasks;
 
 namespace AppComercial.Api.Controllers;
 
@@ -18,6 +18,9 @@ public class ClientesController : ControllerBase
         _mediator = mediator;
     }
 
+    /// <summary>
+    /// Consulta paginada del catálogo de clientes con filtros opcionales.
+    /// </summary>
     [HttpGet]
     public async Task<ActionResult<PaginatedResult<ClienteDto>>> Get(
         [FromQuery] string? search,
@@ -27,11 +30,10 @@ public class ClientesController : ControllerBase
     {
         try
         {
-            // Para el endpoint de Clientes, exigimos Tipo=1 (Cliente)
             var query = new GetClientesQuery 
             { 
                 SearchTerm = search, 
-                TipoCliente = 1,
+                TipoCliente = 1, // 1 = Clientes y Mixtos
                 Page = page,
                 PageSize = pageSize,
                 OnlyActive = onlyActive
@@ -45,36 +47,112 @@ public class ClientesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Obtiene la ficha detallada de un cliente por su código, incluyendo su domicilio fiscal y condiciones comerciales.
+    /// </summary>
+    [HttpGet("{codigo}")]
+    public async Task<ActionResult<ClienteDetalleDto>> GetByCodigo(string codigo)
+    {
+        try
+        {
+            var query = new GetClienteByCodigoQuery(codigo);
+            var result = await _mediator.Send(query);
+            if (result == null)
+                return NotFound($"No se encontró ningún cliente con el código '{codigo}'.");
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error al obtener detalle del cliente: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Obtiene el saldo actual, saldo vencido, crédito disponible y documentos pendientes del cliente.
+    /// </summary>
+    [HttpGet("{codigo}/saldo")]
+    public async Task<ActionResult<SaldoClienteDto>> GetSaldo(string codigo)
+    {
+        try
+        {
+            var query = new GetSaldoClienteQuery(codigo);
+            var result = await _mediator.Send(query);
+            if (result == null)
+                return NotFound($"No se encontró ningún cliente con el código '{codigo}'.");
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error al obtener saldo del cliente: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Registra un nuevo cliente en CONTPAQi Comercial vía SDK con opción de domicilio fiscal.
+    /// </summary>
     [HttpPost]
     public async Task<ActionResult<int>> Post([FromBody] CreateClienteCommand command)
     {
         try
         {
-            // Forzamos que sea un cliente
             command.TipoCliente = 1;
             var result = await _mediator.Send(command);
-            return Ok(result);
+            return CreatedAtAction(nameof(GetByCodigo), new { codigo = command.Codigo }, result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error al crear el cliente en el SDK COM: {ex.Message}");
+            return StatusCode(500, $"Error al crear el cliente en el SDK: {ex.Message}");
         }
     }
 
+    /// <summary>
+    /// Actualiza los datos generales, fiscales, de crédito o domicilio de un cliente existente.
+    /// </summary>
     [HttpPut("{codigo}")]
     public async Task<ActionResult<int>> Put(string codigo, [FromBody] UpdateClienteCommand command)
     {
         try
         {
-            // Forzamos que sea un cliente
             command.TipoCliente = 1;
             command.Codigo = codigo;
             var result = await _mediator.Send(command);
             return Ok(result);
         }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
         catch (Exception ex)
         {
-            return StatusCode(500, $"Error al actualizar el cliente en el SDK COM: {ex.Message}");
+            return StatusCode(500, $"Error al actualizar el cliente en el SDK: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Modifica el estatus de un cliente (Baja lógica o reactivación).
+    /// </summary>
+    [HttpPatch("{codigo}/estatus")]
+    public async Task<ActionResult<bool>> CambiarEstatus(string codigo, [FromQuery] bool activo)
+    {
+        try
+        {
+            var command = new CambiarEstatusClienteCommand(codigo, activo);
+            var result = await _mediator.Send(command);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error al actualizar el estatus del cliente: {ex.Message}");
         }
     }
 }
